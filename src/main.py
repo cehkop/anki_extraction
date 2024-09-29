@@ -34,10 +34,6 @@ ANKI_CONNECT_URL = "http://localhost:8765"
 class TextInput(BaseModel):
     text: str
 
-# Pydantic model for the extracted pair
-class CardPair(BaseModel):
-    front: str
-    back: str
 
 # Function to add a card to Anki
 def add_card_to_anki(deck_name: str, front: str, back: str):
@@ -59,14 +55,23 @@ def add_card_to_anki(deck_name: str, front: str, back: str):
             }
         }
     }
-    response = requests.post(ANKI_CONNECT_URL, json=payload).json()
+    try:
+        response = requests.post(ANKI_CONNECT_URL, json=payload).json()
+    except requests.exceptions.RequestException as e:
+        print(f"Seems like Anki or AnkiConnect is not running: {e}")
+        return False
+    
     if response.get("error"):
         print(f"Error adding card: {response['error']}")
+        return False
     else:
         print(f"Added card: {front} - {back}")
+    return True
+
 
 # Asynchronous function to process text with OpenAI API
 async def process_with_openai(text: str):
+    # return [{"Front": "knack for", "Back": "An aptitude for doing something."}]
     prompt = (
         "You are an assistant that extracts useful collocations, phrases, or sentences from the given text. "
         "For each item, provide a pair consisting of the original text and either a definition in English or a translation if it's complex. "
@@ -129,11 +134,9 @@ async def process_with_openai(text: str):
         )
 
         output = response.choices[0].message.content
-        print(output)
         if output:
             data = json.loads(output)
             pairs = data.get("Cards", [])
-            print(pairs)
             return pairs
         else:
             raise ValueError("No function_call in response.")
@@ -141,6 +144,7 @@ async def process_with_openai(text: str):
     except Exception as e:
         print(f"OpenAI API error: {e}")
         return []
+
 
 # API endpoint
 @app.post("/process_text")
@@ -155,10 +159,11 @@ async def process_text(input_data: TextInput):
 
     # Step 2: Add pairs to Anki
     deck_name = "test" 
+    pairs_status = []
     for pair in pairs:
-        front = pair.get("front")
-        back = pair.get("back")
+        front = pair.get("Front")
+        back = pair.get("Back")
         if front and back:
-            add_card_to_anki(deck_name, front, back)
-
-    return {"status": "success", "added_cards": pairs}
+            status = add_card_to_anki(deck_name, front, back)
+            pairs_status.append({"Status": status, "Front": front, "Back": back})
+    return {"status": pairs_status}
