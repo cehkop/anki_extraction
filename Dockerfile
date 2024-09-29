@@ -42,9 +42,9 @@ COPY .env /app/.env
 
 # Create a non-root user and make directories for logs with appropriate permissions
 RUN useradd -m app \
-    && mkdir -p /app/logs /var/log/supervisor \
-    && chown -R app:app /app/logs /var/log/supervisor /app \
-    && chmod -R 0777 /app/logs /app /var/log/supervisor
+    && mkdir -p /app/logs \
+    && chown -R app:app /app/logs /app \
+    && chmod -R 0777 /app/logs /app 
 
 # Switch to non-root user
 USER app
@@ -53,4 +53,4 @@ USER app
 EXPOSE 2341
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "2341"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "2341", "--reload"]
