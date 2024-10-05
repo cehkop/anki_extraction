@@ -1,0 +1,11 @@
+/* src/components/Config.css */
+
+.config {
+  background-color: #f5f5f5;
+  padding: 10px;
+  height: 90%;
+}
+
+.config h2 {
+  margin-top: 0;
+}

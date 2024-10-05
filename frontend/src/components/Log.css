@@ -1,0 +1,21 @@
+/* src/components/Log.css */
+
+.log {
+    background-color: #f0f0f0;
+    padding: 10px;
+    height: 90%;
+  }
+  
+  .log h2 {
+    margin-top: 0;
+  }
+  
+  .log-content {
+    text-align: left;
+  }
+  
+  .log-entry {
+    border-bottom: 1px solid #ddd;
+    padding: 5px 0;
+  }
+  

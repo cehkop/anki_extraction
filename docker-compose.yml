@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "2341:2341"
+    network_mode: "host"  # Use host network mode on Linux
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_PROXY=${OPENAI_PROXY}
+      - ANKI_CONNECT_URL=http://localhost:8765  # Now 'localhost' refers to the host
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "2342:2342"
+    depends_on:
+      - backend
+    networks:
+      - app-network  # frontend can use the Docker bridge network
+
+networks:
+  app-network:
+    driver: bridge

@@ -1,0 +1,113 @@
+/* General reset to remove all default margins/paddings */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, .App {
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* No scrolling should occur */
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: #121212;
+}
+
+/* Ensure that the root container and all its children stretch fully */
+#root, .MuiBox-root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #121212; /* Dark material design background */
+}
+
+/* Main container to hold all sections (config, input, log) */
+.container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: stretch; 
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Prevents scrolling */
+}
+
+/* Styling each component */
+.config, .input-section, .log {
+  height: 100%;
+  overflow: hidden;
+  padding: 10px; /* Padding for internal spacing */
+  background-color: #1e1e1e;
+}
+
+/* Set flex-basis to make input section wider */
+.config {
+  flex-basis: 25%;
+}
+
+.input-section {
+  flex-basis: 50%;
+}
+
+.log {
+  flex-basis: 25%;
+  overflow-y: auto; /* Allow scroll for log */
+}
+
+/* Button styling */
+button {
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #1565c0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .config, .input-section, .log {
+    flex-basis: auto;  /* Remove fixed width allocation */
+    width: 100%;
+    height: 33.33%; /* Each section gets 1/3 of the height */
+  }
+}
+
+/* Target specific Material-UI generated classes */
+.MuiBox-root, .MuiGrid-container, .MuiPaper-root, .MuiFormControl-root, .MuiInputBase-root, .MuiOutlinedInput-root {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure that the root container and all its children stretch fully */
+#root, .MuiBox-root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.MuiGrid-item {
+  padding: 0 !important;
+}
+
+.MuiPaper-root {
+  margin: 0 !important;
+  box-shadow: none !important;
+}

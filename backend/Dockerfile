@@ -38,7 +38,7 @@ WORKDIR /app
 
 # Copy the application code
 COPY src /app/src
-COPY .env /app/.env
+# COPY .env /app/.env
 
 # Create a non-root user and make directories for logs with appropriate permissions
 RUN useradd -m app \

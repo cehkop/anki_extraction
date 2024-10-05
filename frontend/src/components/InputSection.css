@@ -1,0 +1,12 @@
+/* src/components/InputSection.css */
+
+.input-section {
+    background-color: #ffffff;
+    padding: 10px;
+    height: 90%;
+  }
+  
+  .input-section h2 {
+    margin-top: 0;
+  }
+  

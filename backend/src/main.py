@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import dotenv
@@ -16,7 +17,7 @@ app = FastAPI()
 dotenv.load_dotenv()
 
 # Define the Anki-Connect endpoint
-ANKI_CONNECT_URL = "http://localhost:8765"
+ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
 
 # Pydantic model for input
 class TextInput(BaseModel):
@@ -82,8 +83,8 @@ async def process_text(input_data: TextInput):
 
 
 # Function to process all images in a folder
-@app.post("/upload_images")
-async def upload_images(files: List[UploadFile] = File(...)):
+@app.post("/process_images")
+async def process_images(files: List[UploadFile] = File(...)):
     images_folder = "uploaded_images"
     os.makedirs(images_folder, exist_ok=True)
 
@@ -94,7 +95,7 @@ async def upload_images(files: List[UploadFile] = File(...)):
         if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
             raise HTTPException(status_code=400, detail=f"Invalid image type: {file.filename}")
 
-        # Limit file size (e.g., 5MB)
+        # Limit file size 5MB
         file_size = await file.read()
         if len(file_size) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail=f"File too large: {file.filename}")
@@ -180,3 +181,13 @@ async def upload_image(file: UploadFile = File(...)):
             pairs_status.append({"Status": status, "Front": front, "Back": back})
 
     return {"status": pairs_status}
+
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or specify your frontend's URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

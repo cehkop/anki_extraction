@@ -5,7 +5,7 @@ import os
 
 
 proxy_url = os.getenv("OPENAI_PROXY")
-if proxy_url is not None:
+if proxy_url is not None and proxy_url != "":
     http_client = httpx.AsyncClient(proxy=proxy_url)
 else:
     http_client = httpx.AsyncClient()
