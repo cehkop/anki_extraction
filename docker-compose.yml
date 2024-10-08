@@ -2,10 +2,12 @@ version: '3.8'
 
 services:
   backend:
+    restart: always
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
+    tty: true
     ports:
       - "2341:2341"
     network_mode: "host"  # Use host network mode on Linux
@@ -15,6 +17,8 @@ services:
       - ANKI_CONNECT_URL=http://localhost:8765  # Now 'localhost' refers to the host
 
   frontend:
+    restart: always
+    tty: true
     build:
       context: ./frontend
       dockerfile: Dockerfile

@@ -1,22 +1,18 @@
 // src/components/InputSection.js
 
 import React from 'react';
-import { Paper, Typography } from '@mui/material';
 import TextForm from './TextForm';
 import ImageUpload from './ImageUpload';
 
-function InputSection({ inputMode, handleLog }) {
+function InputSection({ inputMode, handleLog, deckName }) {
   return (
-    <Paper sx={{ padding: 2, height: '100%', boxSizing: 'border-box', overflow: 'auto' }} elevation={3}>
-      <Typography variant="h6" gutterBottom>
-        Input
-      </Typography>
+    <div>
       {inputMode === 'text' ? (
-        <TextForm handleLog={handleLog} />
+        <TextForm handleLog={handleLog} deckName={deckName} />
       ) : (
-        <ImageUpload handleLog={handleLog} />
+        <ImageUpload handleLog={handleLog} deckName={deckName} />
       )}
-    </Paper>
+    </div>
   );
 }
 

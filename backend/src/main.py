@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile
+# backend/src/main.py
+
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -6,32 +8,39 @@ import dotenv
 import requests
 import shutil
 from typing import List
+import logging
 
 from src.utils import image_to_base64
 from src.processing import extract_pairs_from_text, extract_pairs_from_image
 
+logging.basicConfig(level=logging.INFO, 
+                    format="%(asctime)s - %(levelname)s - %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S",
+                    filename="logs.txt",
+                    filemode="a"
+                    )
+
 app = FastAPI()
 
-
-# Set your OpenAI API key (ensure it's securely stored in environment variables)
 dotenv.load_dotenv()
 
 # Define the Anki-Connect endpoint
 ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
 
 # Pydantic model for input
-class TextInput(BaseModel):
+class Input_Data(BaseModel):
     text: str
+    deckName: str 
 
 
 # Function to add a card to Anki
-def add_card_to_anki(deck_name: str, front: str, back: str):
+def add_card_to_anki(deckName: str, front: str, back: str):
     payload = {
         "action": "addNote",
         "version": 6,
         "params": {
             "note": {
-                "deckName": deck_name,
+                "deckName": deckName,
                 "modelName": "Основная (с обратной карточкой)",
                 "fields": {"Лицо": front, "Оборот": back},
                 "options": {
@@ -61,9 +70,18 @@ def add_card_to_anki(deck_name: str, front: str, back: str):
 
 # API endpoint
 @app.post("/process_text")
-async def process_text(input_data: TextInput):
+async def process_text(input_data: Input_Data):
     text = input_data.text
+    deckName = input_data.deckName
+    if not deckName:
+        deckName = "test"
 
+    logging.info("Processing text. Deck name: %s", deckName)
+    logging.info("Text: %s", text)
+
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided.")
+    
     # Step 1: Process text with OpenAI API
     pairs = await extract_pairs_from_text(text)
 
@@ -71,23 +89,28 @@ async def process_text(input_data: TextInput):
         raise HTTPException(status_code=400, detail="No pairs extracted.")
 
     # Step 2: Add pairs to Anki
-    deck_name = "test"
     pairs_status = []
     for pair in pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:
-            status = add_card_to_anki(deck_name, front, back)
+            status = add_card_to_anki(deckName, front, back)
             pairs_status.append({"Status": status, "Front": front, "Back": back})
     return {"status": pairs_status}
 
 
 # Function to process all images in a folder
 @app.post("/process_images")
-async def process_images(files: List[UploadFile] = File(...)):
+async def process_images(files: List[UploadFile] = File(...),
+                         deckName: str = Form(...)):
     images_folder = "uploaded_images"
     os.makedirs(images_folder, exist_ok=True)
 
+    logging.info("Processing images...")
+    logging.info("Deck name: %s", deckName)
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
     results = []
 
     for file in files:
@@ -125,13 +148,14 @@ async def process_images(files: List[UploadFile] = File(...)):
             continue
 
         # Add pairs to Anki
-        deck_name = "test"  # Replace with your actual deck name
+        if not deckName:
+            deckName = "test"  # Replace with your actual deck name
         pairs_status = []
         for pair in pairs:
             front = pair.get("Front")
             back = pair.get("Back")
             if front and back:
-                status = add_card_to_anki(deck_name, front, back)
+                status = add_card_to_anki(deckName, front, back)
                 pairs_status.append({
                     "Status": status,
                     "Front": front,
@@ -171,16 +195,41 @@ async def upload_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="No pairs extracted from the image.")
 
     # Add pairs to Anki
-    deck_name = "test"  # Replace with your actual deck name
+    deckName = "test"  # Replace with your actual deck name
     pairs_status = []
     for pair in pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:
-            status = add_card_to_anki(deck_name, front, back)
+            status = add_card_to_anki(deckName, front, back)
             pairs_status.append({"Status": status, "Front": front, "Back": back})
 
     return {"status": pairs_status}
+
+
+# Function to get decks from Anki
+def get_decks_from_anki():
+    payload = {
+        "action": "deckNames",
+        "version": 6
+    }
+    try:
+        response = requests.post(ANKI_CONNECT_URL, json=payload).json()
+        if response.get("error"):
+            return None
+        return response.get("result", [])
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching decks: {e}")
+        return None
+
+
+# Endpoint to get all decks
+@app.get("/get_decks")
+async def get_decks():
+    decks = get_decks_from_anki()
+    if decks is None:
+        raise HTTPException(status_code=500, detail="Failed to fetch decks from Anki.")
+    return {"decks": decks}
 
 
 # Add CORS middleware

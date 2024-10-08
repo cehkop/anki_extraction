@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Button, Box } from '@mui/material';
 import { CustomFileInput } from './CustomFileInput';
 
-function ImageUpload({ handleLog }) {
+function ImageUpload({ handleLog, deckName }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef();
 
@@ -25,6 +25,7 @@ function ImageUpload({ handleLog }) {
     selectedFiles.forEach((file) => {
       formData.append('files', file);
     });
+    formData.append('deckName', deckName); // Include deckName in the form data
 
     try {
       const res = await axios.post('http://localhost:2341/process_images', formData, {
@@ -32,8 +33,10 @@ function ImageUpload({ handleLog }) {
           'Content-Type': 'multipart/form-data',
         },
       });
+      fileInputRef.current.clear(); // Clear the input field
+      setSelectedFiles([]);
+      
       handleLog(`Image Response: ${JSON.stringify(res.data, null, 2)}`);
-      // Let the user decide when to clear the input
     } catch (error) {
       console.error(error);
       handleLog('Error processing images.');

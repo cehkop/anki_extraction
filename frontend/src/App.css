@@ -53,11 +53,11 @@ body {
 }
 
 .input-section {
-  flex-basis: 50%;
+  flex-basis: 45%;
 }
 
 .log {
-  flex-basis: 25%;
+  flex-basis: 30%;
   overflow-y: auto; /* Allow scroll for log */
 }
 

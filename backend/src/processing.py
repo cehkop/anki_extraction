@@ -23,21 +23,26 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
 async def extract_pairs_from_text(text: str):
     # return [{"Front": "knack for", "Back": "An aptitude for doing something."}]
     prompt = (
-        "You are an assistant that extracts useful collocations, phrases, or sentences from the given text. "
-        "For each item, provide a pair consisting of the original text and either a definition in English or a translation if it's complex. "
-        "Only include items that are useful for language learning. Here are some examples:\n\n"
+        "You are a perfect English teacher. Teacher are very helpful. Teacher helps me to learn English. "
+        "I use Anki cards to learn English and I need teacher help. My main language is Russian. "
+        "My current English level is about B1. Teacher goals is to help me to learn with anki. "
+        "I want teacher to help me to learn English like natives, without russian dialects. "
+        "For this goal teacher helps me to create anki cards with collocations, phrazes, sentences, etc - everything for effective learning. "
+        "Teacher gets as an input text and extracts any cards pairs of words and their translations to help me improve my English and speak like natives. "
+        "For each item, teacher provides a pair consisting of the original text and either a definition in English or a translation if it's complex. "
+        "Teacher should make cards understandeble for intermediate level. Teacher can also make up sentences for better sensitivity. "
+        "Teacher should only include items that are useful for language learning. Here are some examples:\n\n"
         "Example 1:\n"
         "Text: 'She has a knack for languages.'\n"
-        "Pairs: [{'front': 'knack for', 'back': 'An aptitude for doing something.'}]\n\n"
+        "Cards: [{'Front': 'She has a knack for languages', 'Back': 'She is language inclined.'}]\n\n"
         "Example 2:\n"
         "Text: 'The enigmatic smile of the Mona Lisa has intrigued people for centuries.'\n"
-        "Pairs: [\n"
-        "  {'front': 'enigmatic smile', 'back': 'A mysterious or puzzling smile.'},\n"
-        "  {'front': 'has intrigued people', 'back': 'Has fascinated or interested people deeply.'}\n"
+        "Cards: [\n"
+        "  {'Front': 'enigmatic smile of the Mona Lisa', 'Back': 'A mysterious or puzzling the Mona Lisa smile'},\n"
+        "  {'Front': 'this smile has intrigued people', 'Back': 'This smile has interested people deeply.'}\n"
         "]\n\n"
         "Now, extract pairs from the following text:\n"
-    )
-
+        ),
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -105,7 +110,26 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
         user_content = [
             {
                 "type": "text",
-                "text": "The image shows a document or text. Please extract useful information such as words or collocations, and their translations or definitions.",
+                "text": (
+                    "You are a perfect English teacher. Teacher are very helpful. Teacher helps me to learn English. "
+                    "I use Anki cards to learn English and I need teacher help. My main language is Russian. "
+                    "My current English level is about B1. Teacher goals is to help me to learn with anki. "
+                    "I want teacher to help me to learn English like natives, without russian dialects. "
+                    "For this goal teacher helps me to create anki cards with collocations, phrazes, sentences, etc - everything for effective learning. "
+                    "Teacher gets as an input image with text on it and extracts any cards pairs of words and their translations to help me improve my English and speak like natives. "
+                    "For each item, teacher provides a pair consisting of the original text and either a definition in English or a translation if it's complex. "
+                    "Teacher should make cards understandeble for intermediate level. Teacher can also make up sentences for better sensitivity. "
+                    "Teacher should only include items that are useful for language learning. Here are some examples:\n\n"
+                    "Example 1:\n"
+                    "Text: 'She has a knack for languages.'\n"
+                    "Cards: [{'Front': 'She has a knack for languages', 'Back': 'She is language inclined.'}]\n\n"
+                    "Example 2:\n"
+                    "Text: 'The enigmatic smile of the Mona Lisa has intrigued people for centuries.'\n"
+                    "Cards: [\n"
+                    "  {'Front': 'enigmatic smile of the Mona Lisa', 'Back': 'A mysterious or puzzling the Mona Lisa smile'},\n"
+                    "  {'Front': 'this smile has intrigued people', 'Back': 'This smile has interested people deeply.'}\n"
+                    "]\n\n"
+                    "Now, extract pairs from the following text:\n"),
             },
             {"type": "text", "text": "Image caption: " + image_caption},
             {
