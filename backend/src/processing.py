@@ -39,8 +39,8 @@ async def extract_pairs_from_text(text: str):
         "Example 2:\n"
         "Text: 'The enigmatic smile of the Mona Lisa has intrigued people for centuries.'\n"
         "Cards: [\n"
-        "  {'Front': 'enigmatic smile of the Mona Lisa', 'Back': 'A mysterious or puzzling the Mona Lisa smile'},\n"
-        "  {'Front': 'this smile has intrigued people', 'Back': 'This smile has interested people deeply.'}\n"
+        "{'Front': 'enigmatic smile of the Mona Lisa', 'Back': 'A mysterious or puzzling the Mona Lisa smile'},\n"
+        "{'Front': 'this smile has intrigued people', 'Back': 'This smile has interested people deeply.'}\n"
         "]\n\n"
         "Example 3:\n"
         "Text: 'custom - sth that people in society or a community usually do: It's a custom for people to give presents to a couple getting married.'\n"
@@ -58,7 +58,7 @@ async def extract_pairs_from_text(text: str):
         "Text: 'to be worth sth'\n"
         "Cards: [{'Front': 'to be worth sth - having a particular amount of money', 'Back': 'She must be worth at least half a million.'}]\n\n"
         "Now, extract cards from the following text:\n"
-        ),
+        )
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -105,9 +105,8 @@ async def extract_pairs_from_text(text: str):
             timeout=10,
             max_tokens=1024 * 2,
         )
-        print(response)
+        
         output = response.choices[0].message.content
-        print(output)
         if output:
             data = json.loads(output)
             pairs = data.get("Cards", [])
