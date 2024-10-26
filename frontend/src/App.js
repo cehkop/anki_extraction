@@ -8,7 +8,7 @@ import { Box, Grid } from '@mui/material';
 
 function App() {
   const [inputMode, setInputMode] = useState('text');
-  const [deckName, setDeckName] = useState(''); // New state for selected deck
+  const [deckName, setDeckName] = useState('');
   const [logs, setLogs] = useState([]);
 
   const handleLog = (logEntry) => {
@@ -16,9 +16,9 @@ function App() {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ flexGrow: 1, height: '100vh' }}>
       <Grid container sx={{ height: '100%' }}>
-        <Grid item xs={2} sx={{ borderRight: '1px solid #444' }}>
+        <Grid item xs={2} sx={{ borderRight: '1px solid #444', height: '100%' }}>
           <Config
             inputMode={inputMode}
             setInputMode={setInputMode}
@@ -26,14 +26,14 @@ function App() {
             setDeckName={setDeckName}
           />
         </Grid>
-        <Grid item xs={8} sx={{ borderRight: '1px solid #444' }}>
+        <Grid item xs={7} sx={{ borderRight: '1px solid #444', height: '100%' }}>
           <InputSection
             inputMode={inputMode}
             handleLog={handleLog}
             deckName={deckName}
           />
         </Grid>
-        <Grid item xs={2}>
+        <Grid item xs={3} sx={{ height: '100%' }}>
           <Log logs={logs} />
         </Grid>
       </Grid>
@@ -42,3 +42,4 @@ function App() {
 }
 
 export default App;
+
