@@ -1,73 +1,69 @@
 // src/components/TextForm.js
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
 import { TextField, Button, Box } from '@mui/material';
+import axios from 'axios';
+import ManualCardReview from './ManualCardReview';
 
-function TextForm({ handleLog, deckName }) {
+function TextForm({ handleLog, deckName, processingMode }) {
   const [text, setText] = useState('');
+  const [extractedPairs, setExtractedPairs] = useState(null);
 
-  // Handle text submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (text.trim() === '') {
+
+    if (!text.trim()) {
       alert('Please enter some text.');
       return;
     }
+
+    if (processingMode === 'auto') {
+      // Automatic Processing
+      try {
+        const res = await axios.post('http://localhost:2341/process_text', {
+          text,
+          deckName,
+        });
+        handleLog(`Text Response: ${JSON.stringify(res.data, null, 2)}`);
+        setText('');
+      } catch (error) {
+        console.error(error);
+        handleLog('Error processing text.');
+      }
+    } else {
+      // After receiving the response in manual processing
     try {
-      const res = await axios.post('http://localhost:2341/process_text', {
+      const res = await axios.post('http://localhost:2341/extract_text', {
         text,
-        deckName,
       });
-      setText(''); // Clear the input field
-      handleLog(`Text Response: ${JSON.stringify(res.data, null, 2)}`);
+      console.log('Extracted pairs:', res.data.pairs); // Add this line
+      setExtractedPairs(res.data.pairs);
     } catch (error) {
       console.error(error);
-      handleLog('Error processing text.');
+      handleLog('Error extracting pairs.');
+    }
     }
   };
 
-  // Handle clear button
   const handleClear = () => {
     setText('');
+    setExtractedPairs(null);
   };
 
-  // Handle paste events
-  const handlePaste = async (event) => {
-    const clipboardItems = event.clipboardData.items;
-    for (let i = 0; i < clipboardItems.length; i++) {
-      const item = clipboardItems[i];
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        // Send the image file to the backend for OCR processing
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('deckName', deckName);
-
-        try {
-          const res = await axios.post('http://localhost:2341/process_pasted_image', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          });
-          handleLog(`Image Paste Response: ${JSON.stringify(res.data, null, 2)}`);
-        } catch (error) {
-          console.error(error);
-          handleLog('Error processing pasted image.');
-        }
-
-        event.preventDefault();
-        return; // Exit after handling the image
-      }
+  const handleManualSubmit = async (selectedPairs) => {
+    try {
+      const res = await axios.post('http://localhost:2341/add_cards', {
+        deckName,
+        pairs: selectedPairs,
+      });
+      handleLog(`Added Cards: ${JSON.stringify(res.data, null, 2)}`);
+      setExtractedPairs(null);
+      // Do not clear the text here so that the input remains for comparison
+    } catch (error) {
+      console.error(error);
+      handleLog('Error adding cards.');
     }
   };
-
-  useEffect(() => {
-    window.addEventListener('paste', handlePaste);
-    return () => {
-      window.removeEventListener('paste', handlePaste);
-    };
-  }, [deckName]);
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
@@ -79,15 +75,28 @@ function TextForm({ handleLog, deckName }) {
         fullWidth
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={processingMode === 'manual' && extractedPairs !== null}
       />
       <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-        <Button variant="contained" type="submit">
+        <Button
+          variant="contained"
+          type="submit"
+          disabled={processingMode === 'manual' && extractedPairs !== null}
+        >
           Submit
         </Button>
         <Button variant="outlined" color="error" onClick={handleClear}>
           Clear
         </Button>
       </Box>
+
+      {extractedPairs && (
+        <ManualCardReview
+          pairs={extractedPairs}
+          onSubmit={handleManualSubmit}
+          onCancel={handleClear}
+        />
+      )}
     </Box>
   );
 }

@@ -1,5 +1,3 @@
-// src/App.js
-
 import React, { useState } from 'react';
 import Config from './components/Config';
 import InputSection from './components/InputSection';
@@ -9,6 +7,7 @@ import { Box, Grid } from '@mui/material';
 function App() {
   const [inputMode, setInputMode] = useState('text');
   const [deckName, setDeckName] = useState('');
+  const [processingMode, setProcessingMode] = useState('auto'); // New state for processing mode
   const [logs, setLogs] = useState([]);
 
   const handleLog = (logEntry) => {
@@ -24,6 +23,8 @@ function App() {
             setInputMode={setInputMode}
             deckName={deckName}
             setDeckName={setDeckName}
+            processingMode={processingMode}
+            setProcessingMode={setProcessingMode}
           />
         </Grid>
         <Grid item xs={7} sx={{ borderRight: '1px solid #444', height: '100%' }}>
@@ -31,6 +32,7 @@ function App() {
             inputMode={inputMode}
             handleLog={handleLog}
             deckName={deckName}
+            processingMode={processingMode}
           />
         </Grid>
         <Grid item xs={3} sx={{ height: '100%' }}>
@@ -42,4 +44,3 @@ function App() {
 }
 
 export default App;
-

@@ -1,5 +1,3 @@
-// src/components/Config.js
-
 import React, { useState, useEffect } from 'react';
 import {
   Paper,
@@ -17,13 +15,18 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
-function Config({ inputMode, setInputMode, deckName, setDeckName }) {
+function Config({ inputMode, setInputMode, deckName, setDeckName, processingMode, setProcessingMode }) {
   const [decks, setDecks] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState('test'); // Default deck name
 
   // Handle input mode change
   const handleInputChange = (e) => {
     setInputMode(e.target.value);
+  };
+
+  // Handle processing mode change
+  const handleProcessingModeChange = (e) => {
+    setProcessingMode(e.target.value);
   };
 
   // Handle deck name change
@@ -69,6 +72,20 @@ function Config({ inputMode, setInputMode, deckName, setDeckName }) {
         >
           <FormControlLabel value="text" control={<Radio />} label="Text" />
           <FormControlLabel value="image" control={<Radio />} label="Image" />
+        </RadioGroup>
+      </FormControl>
+
+      {/* Processing Mode Selection */}
+      <FormControl component="fieldset" sx={{ mt: 4 }}>
+        <FormLabel component="legend">Processing Mode</FormLabel>
+        <RadioGroup
+          aria-label="processing-mode"
+          value={processingMode}
+          onChange={handleProcessingModeChange}
+          name="processing-mode"
+        >
+          <FormControlLabel value="auto" control={<Radio />} label="Automatic" />
+          <FormControlLabel value="manual" control={<Radio />} label="Manual" />
         </RadioGroup>
       </FormControl>
 

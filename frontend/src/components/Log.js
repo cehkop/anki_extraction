@@ -11,7 +11,7 @@ function Log({ logs }) {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTo({
         top: 0,
-        behavior: 'smooth', // Smooth scrolling to the top
+        behavior: 'smooth',
       });
     }
   }, [logs]);
@@ -20,7 +20,7 @@ function Log({ logs }) {
     <Paper
       sx={{
         padding: 2,
-        height: '100%', // Ensure the Paper fills the available height
+        height: '100%',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -46,12 +46,8 @@ function Log({ logs }) {
             let isJson = false;
 
             try {
-              if (log.startsWith('Image Response:')) {
-                const jsonString = log.substring('Image Response:'.length);
-                parsedLog = JSON.parse(jsonString);
-                isJson = true;
-              } else if (log.startsWith('Text Response:')) {
-                const jsonString = log.substring('Text Response:'.length);
+              if (log.startsWith('Image Response:') || log.startsWith('Text Response:') || log.startsWith('Added Cards:')) {
+                const jsonString = log.substring(log.indexOf(':') + 1);
                 parsedLog = JSON.parse(jsonString);
                 isJson = true;
               }
@@ -63,97 +59,72 @@ function Log({ logs }) {
               const elements = [];
 
               if (parsedLog.results) {
-                // Handle Image Response
                 elements.push(
                   <Box key={index} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontSize: '0.7rem' }}>
+                    <Typography variant="subtitle2" sx={{ fontSize: '0.75rem', color: '#fff' }}>
                       Image Response
                     </Typography>
-                    {parsedLog.results.map((result, idx) => {
-                      const imageName = result.Image;
-                      const pairs = result.Pairs || [];
-
-                      return (
-                        <Box key={`${index}-${idx}`} sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" sx={{ fontSize: '0.7rem' }}>
-                            {`Image: ${imageName}`}
-                          </Typography>
-                          {pairs.map((pair, pairIndex) => {
-                            const success = pair.Status;
-                            return (
-                              <Box
-                                key={pairIndex}
-                                sx={{
-                                  backgroundColor: success ? '#003300' : '#330000',
-                                  color: 'white',
-                                  p: 1,
-                                  mb: 1,
-                                  borderRadius: 1,
-                                }}
-                              >
-                                <Typography variant="body2" sx={{ fontSize: '0.65rem' }}>
-                                  <strong>Front:</strong> {pair.Front}
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontSize: '0.65rem' }}>
-                                  <strong>Back:</strong> {pair.Back}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-                      );
-                    })}
+                    {parsedLog.results.map((result, idx) => (
+                      <Box key={`${index}-${idx}`} sx={{ mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.7rem', color: '#ccc' }}>
+                          {`Image: ${result.Image}`}
+                        </Typography>
+                        {(result.Pairs || []).map((pair, pairIndex) => (
+                          <Box
+                            key={pairIndex}
+                            sx={{
+                              backgroundColor: pair.Status ? '#003300' : '#330000',
+                              color: 'white',
+                              p: 0.5,
+                              mb: 0.5,
+                              borderRadius: 1,
+                              fontSize: '0.65rem',
+                            }}
+                          >
+                            <strong>Front:</strong> {pair.Front} <br />
+                            <strong>Back:</strong> {pair.Back}
+                          </Box>
+                        ))}
+                      </Box>
+                    ))}
                   </Box>
                 );
               } else if (parsedLog.status) {
-                // Handle Text Response
                 elements.push(
                   <Box key={index} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontSize: '0.7rem' }}>
-                      Text Response
+                    <Typography variant="subtitle2" sx={{ fontSize: '0.75rem', color: '#fff' }}>
+                      {log.startsWith('Added Cards:') ? 'Added Cards' : 'Text Response'}
                     </Typography>
-                    {parsedLog.status.map((pair, pairIndex) => {
-                      const success = pair.Status;
-                      return (
-                        <Box
-                          key={pairIndex}
-                          sx={{
-                            backgroundColor: success ? '#003300' : '#330000',
-                            color: 'white',
-                            p: 1,
-                            mb: 1,
-                            borderRadius: 1,
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontSize: '0.65rem' }}>
-                            <strong>Front:</strong> {pair.Front}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.65rem' }}>
-                            <strong>Back:</strong> {pair.Back}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
+                    {parsedLog.status.map((pair, pairIndex) => (
+                      <Box
+                        key={pairIndex}
+                        sx={{
+                          backgroundColor: pair.Status ? '#003300' : '#330000',
+                          color: 'white',
+                          p: 0.5,
+                          mb: 0.5,
+                          borderRadius: 1,
+                          fontSize: '0.65rem',
+                        }}
+                      >
+                        <strong>Front:</strong> {pair.Front} <br />
+                        <strong>Back:</strong> {pair.Back}
+                      </Box>
+                    ))}
                   </Box>
                 );
               } else {
-                // Unknown format
                 elements.push(
-                  <Typography key={index} variant="body2" sx={{ fontSize: '0.65rem' }}>
+                  <Typography key={index} variant="body2" sx={{ fontSize: '0.65rem', color: '#ccc' }}>
                     {log}
                   </Typography>
                 );
               }
 
-              return (
-                <React.Fragment key={index}>
-                  {elements}
-                </React.Fragment>
-              );
+              return <React.Fragment key={index}>{elements}</React.Fragment>;
             } else {
-              // Not JSON or parsing error
               return (
-                <Typography key={index} variant="body2" sx={{ fontSize: '0.65rem' }}>
+                <Typography key={index} variant="body2" sx={{ fontSize: '0.65rem', color: '#ccc' }}>
                   {log}
                 </Typography>
               );

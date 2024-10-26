@@ -31,6 +31,14 @@ ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
 class Input_Data(BaseModel):
     text: str
     deckName: str 
+    
+    
+class ExtractTextInput(BaseModel):
+    text: str
+
+class AddCardsInput(BaseModel):
+    deckName: str
+    pairs: List[dict]
 
 
 # Function to add a card to Anki
@@ -230,6 +238,73 @@ async def get_decks():
     if decks is None:
         raise HTTPException(status_code=500, detail="Failed to fetch decks from Anki.")
     return {"decks": decks}
+
+
+# Extract pairs from text
+@app.post("/extract_text")
+async def extract_text(input_data: ExtractTextInput):
+    text = input_data.text
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided.")
+    pairs = await extract_pairs_from_text(text)
+    if not pairs:
+        raise HTTPException(status_code=400, detail="No pairs extracted.")
+    return {"pairs": pairs}
+
+
+# Add selected cards to Anki
+@app.post("/add_cards")
+async def add_cards(input_data: AddCardsInput):
+    deckName = input_data.deckName
+    pairs = input_data.pairs
+    if not deckName:
+        deckName = "test"
+    if not pairs:
+        raise HTTPException(status_code=400, detail="No pairs provided.")
+    pairs_status = []
+    for pair in pairs:
+        front = pair.get("Front")
+        back = pair.get("Back")
+        if front and back:
+            status = add_card_to_anki(deckName, front, back)
+            pairs_status.append({"Status": status, "Front": front, "Back": back})
+    return {"status": pairs_status}
+
+
+# Extract pairs from images
+@app.post("/extract_images")
+async def extract_images(files: List[UploadFile] = File(...)):
+    images_folder = "uploaded_images"
+    os.makedirs(images_folder, exist_ok=True)
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
+
+    all_pairs = []
+
+    for file in files:
+        # Validate and save the uploaded image
+        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise HTTPException(status_code=400, detail=f"Invalid image type: {file.filename}")
+        file_path = os.path.join(images_folder, file.filename)
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save image {file.filename}: {e}")
+
+        # Convert the image to base64
+        base64_image = image_to_base64(file_path)
+
+        # Extract pairs from the image
+        pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
+        if pairs:
+            all_pairs.extend(pairs)
+
+    if not all_pairs:
+        raise HTTPException(status_code=400, detail="No pairs extracted from images.")
+
+    return {"pairs": all_pairs}
 
 
 # Add CORS middleware
