@@ -146,7 +146,7 @@ async def process_images(files: List[UploadFile] = File(...),
 
         # Process the image with OpenAI API
         pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
-
+        logging.info("Pairs extracted: %s", pairs)
         if not pairs:
             results.append({
                 "Image": file.filename,
@@ -198,6 +198,7 @@ async def upload_image(file: UploadFile = File(...)):
 
     # Process the image with OpenAI API
     pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
+    logging.info("Pairs extracted: %s", pairs)
 
     if not pairs:
         raise HTTPException(status_code=400, detail="No pairs extracted from the image.")
@@ -247,6 +248,7 @@ async def extract_text(input_data: ExtractTextInput):
     if not text:
         raise HTTPException(status_code=400, detail="No text provided.")
     pairs = await extract_pairs_from_text(text)
+    logging.info("Pairs extracted: %s", pairs)
     if not pairs:
         raise HTTPException(status_code=400, detail="No pairs extracted.")
     return {"pairs": pairs}
@@ -281,7 +283,7 @@ async def extract_images(files: List[UploadFile] = File(...)):
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
     all_pairs = []
-
+    logging.info("Count of files: %s", len(files))
     for file in files:
         # Validate and save the uploaded image
         if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
@@ -298,6 +300,7 @@ async def extract_images(files: List[UploadFile] = File(...)):
 
         # Extract pairs from the image
         pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
+        logging.info("Pairs extracted: %s", pairs)
         if pairs:
             all_pairs.extend(pairs)
 
