@@ -1,3 +1,5 @@
+// src/App.js
+
 import React, { useState } from 'react';
 import Config from './components/Config';
 import InputSection from './components/InputSection';
@@ -7,7 +9,7 @@ import { Box, Grid } from '@mui/material';
 function App() {
   const [inputMode, setInputMode] = useState('text');
   const [deckName, setDeckName] = useState('');
-  const [processingMode, setProcessingMode] = useState('auto'); // New state for processing mode
+  const [processingMode, setProcessingMode] = useState('manual'); // New state for processing mode
   const [logs, setLogs] = useState([]);
 
   const handleLog = (logEntry) => {

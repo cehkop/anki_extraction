@@ -1,3 +1,5 @@
+// src/components/InputSection.js
+
 import React from 'react';
 import TextForm from './TextForm';
 import ImageUpload from './ImageUpload';

@@ -31,7 +31,8 @@ function ManualCardReview({ pairs, onSubmit, onCancel }) {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        alignItems: 'center',
+        mt: 2,
       }}
     >
       <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
@@ -40,12 +41,15 @@ function ManualCardReview({ pairs, onSubmit, onCancel }) {
 
       <Box
         sx={{
-          flex: 1, // Takes up remaining space
+          width: '100%',
+          maxWidth: '600px',
+          maxHeight: '50vh', // Limits the height, enabling scrolling if too many cards
           border: '1px solid #444',
           borderRadius: 2,
           p: 2,
           backgroundColor: '#2c2c2c',
-          overflowY: 'auto', // Enable scrolling for overflow
+          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.3)',
+          overflowY: 'auto', // Enable scrolling
           mt: 1,
         }}
       >
@@ -56,7 +60,7 @@ function ManualCardReview({ pairs, onSubmit, onCancel }) {
               border: '1px solid #ccc',
               borderRadius: 1,
               p: 0.5, // Reduced padding for smaller gap
-              mb: 1, // Smaller margin between cards
+              mb: 0.5, // Smaller margin between cards
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -80,7 +84,7 @@ function ManualCardReview({ pairs, onSubmit, onCancel }) {
                   onChange={() => handleCheckboxChange(index)}
                 />
               }
-              label="Add this card"
+              label="Add"
               labelPlacement="start"
               sx={{ ml: 1, color: '#fff', fontSize: '0.75rem' }}
             />

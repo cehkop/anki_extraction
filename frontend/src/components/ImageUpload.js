@@ -1,6 +1,8 @@
+// src/components/ImageUpload.js
+
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
-import { Button, Box } from '@mui/material';
+import { Button, Box, Typography } from '@mui/material';
 import { CustomFileInput } from './CustomFileInput';
 import ManualCardReview from './ManualCardReview';
 
@@ -37,7 +39,6 @@ function ImageUpload({ handleLog, deckName, processingMode }) {
         });
         fileInputRef.current.clear(); // Clear the input field
         setSelectedFiles([]);
-
         handleLog(`Image Response: ${JSON.stringify(res.data, null, 2)}`);
       } catch (error) {
         console.error(error);
@@ -56,7 +57,7 @@ function ImageUpload({ handleLog, deckName, processingMode }) {
             'Content-Type': 'multipart/form-data',
           },
         });
-        setExtractedPairs(res.data.pairs);
+        setExtractedPairs(res.data.pairs); // Set extracted pairs for manual review
       } catch (error) {
         console.error(error);
         handleLog('Error extracting pairs from images.');
@@ -71,9 +72,9 @@ function ImageUpload({ handleLog, deckName, processingMode }) {
         pairs: selectedPairs,
       });
       handleLog(`Added Cards: ${JSON.stringify(res.data, null, 2)}`);
-      setExtractedPairs(null);
-      setSelectedFiles([]);
-      fileInputRef.current.clear();
+      setExtractedPairs(null); // Clear extracted pairs after submission
+      setSelectedFiles([]); // Clear selected files
+      fileInputRef.current.clear(); // Clear file input ref
     } catch (error) {
       console.error(error);
       handleLog('Error adding cards.');
@@ -88,24 +89,29 @@ function ImageUpload({ handleLog, deckName, processingMode }) {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+      <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+        Image Upload
+      </Typography>
+
+      <CustomFileInput ref={fileInputRef} onFileChange={handleFileChange} />
+
       {!extractedPairs ? (
-        <>
-          <CustomFileInput ref={fileInputRef} onFileChange={handleFileChange} />
-          <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-            <Button variant="contained" type="submit">
-              Submit
-            </Button>
-            <Button variant="outlined" color="error" onClick={handleClear}>
-              Clear
-            </Button>
-          </Box>
-        </>
+        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+          <Button variant="contained" type="submit">
+            Submit
+          </Button>
+          <Button variant="outlined" color="error" onClick={handleClear}>
+            Clear
+          </Button>
+        </Box>
       ) : (
-        <ManualCardReview
-          pairs={extractedPairs}
-          onSubmit={handleManualSubmit}
-          onCancel={handleClear}
-        />
+        <Box sx={{ mt: 2 }}>
+          <ManualCardReview
+            pairs={extractedPairs}
+            onSubmit={handleManualSubmit}
+            onCancel={handleClear}
+          />
+        </Box>
       )}
     </Box>
   );

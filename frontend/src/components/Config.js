@@ -1,3 +1,5 @@
+// src/components/Config.js
+
 import React, { useState, useEffect } from 'react';
 import {
   Paper,
@@ -80,7 +82,7 @@ function Config({ inputMode, setInputMode, deckName, setDeckName, processingMode
         <FormLabel component="legend">Processing Mode</FormLabel>
         <RadioGroup
           aria-label="processing-mode"
-          value={processingMode}
+          value={processingMode || 'manual'} // Default to 'manual' if no value is set
           onChange={handleProcessingModeChange}
           name="processing-mode"
         >

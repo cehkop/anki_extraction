@@ -25,23 +25,23 @@ function TextForm({ handleLog, deckName, processingMode }) {
           deckName,
         });
         handleLog(`Text Response: ${JSON.stringify(res.data, null, 2)}`);
-        setText('');
+        setText(''); // Clear the input field
       } catch (error) {
         console.error(error);
         handleLog('Error processing text.');
       }
     } else {
-      // After receiving the response in manual processing
-    try {
-      const res = await axios.post('http://localhost:2341/extract_text', {
-        text,
-      });
-      console.log('Extracted pairs:', res.data.pairs); // Add this line
-      setExtractedPairs(res.data.pairs);
-    } catch (error) {
-      console.error(error);
-      handleLog('Error extracting pairs.');
-    }
+      // Manual Processing - Extract pairs without clearing input initially
+      try {
+        const res = await axios.post('http://localhost:2341/extract_text', {
+          text,
+        });
+        console.log('Extracted pairs:', res.data.pairs);
+        setExtractedPairs(res.data.pairs);
+      } catch (error) {
+        console.error(error);
+        handleLog('Error extracting pairs.');
+      }
     }
   };
 
@@ -57,8 +57,8 @@ function TextForm({ handleLog, deckName, processingMode }) {
         pairs: selectedPairs,
       });
       handleLog(`Added Cards: ${JSON.stringify(res.data, null, 2)}`);
-      setExtractedPairs(null);
-      // Do not clear the text here so that the input remains for comparison
+      setExtractedPairs(null); // Clear extracted pairs after submission
+      setText(''); // Clear the input field after manual submission
     } catch (error) {
       console.error(error);
       handleLog('Error adding cards.');
