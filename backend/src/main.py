@@ -143,7 +143,7 @@ async def process_images(
             content = await read_and_validate_image(file)
             base64_image = image_to_base64(BytesIO(content))
 
-            # Await the asynchronous extract_pairs_from_image
+            # Process the image with OpenAI API
             pairs = await extract_pairs_from_image(base64_image, image_caption=filename)
             logger.info("Pairs extracted from %s: %s", filename, pairs)
 
@@ -160,9 +160,22 @@ async def process_images(
                 front = pair.get("Front")
                 back = pair.get("Back")
                 if front and back:
-                    anki_status = await add_card_to_anki(anki_client, deckName, front, back)
-                    pairs_status.append(CardStatus(Status=anki_status, Front=front, Back=back)
-                    )
+                    try:
+                        anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                        pairs_status.append({
+                            "Status": anki_status,
+                            "Front": front,
+                            "Back": back,
+                        })
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to add card for Front: {front}, Back: {back}. Error: {e}"
+                        )
+                        pairs_status.append({
+                            "Status": False,
+                            "Front": front,
+                            "Back": back,
+                        })
 
             return {
                 "Image": filename,
@@ -180,7 +193,8 @@ async def process_images(
     # Process images in parallel
     results = await asyncio.gather(*(process_single_image(file) for file in files))
 
-    return {"pairs": results}
+    # Return results in the same format as the original implementation
+    return {"results": results}
 
 
 # Endpoint to upload an image and process it
@@ -351,7 +365,7 @@ async def extract_images(files: List[UploadFile] = File(...)):
                 for pair in pairs
             ] if pairs else []
         except Exception as e:
-            logger.exception(f"Failed to process image {filename}")
+            logger.exception(f"Failed to process image {filename}, error: {str(e)}")
             return []
 
     # Process images in parallel
