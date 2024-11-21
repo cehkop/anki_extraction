@@ -249,13 +249,13 @@ async def upload_image(
 # Endpoint to get all decks
 @app.get("/get_decks", response_model=DecksResponse)
 async def get_decks():
-    decks = await anki_service.get_decks()
-    if decks is None:
+    response = await anki_service.get_decks()
+    if not response["success"]:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch decks from Anki.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=response.get("error", "Failed to fetch decks."),
         )
-    return {"decks": decks}
+    return {"decks": response["decks"]}
 
 
 # Extract pairs from text
@@ -289,7 +289,7 @@ async def extract_text(input_data: ExtractTextInput):
     response_model=Dict[str, Any],
     status_code=status.HTTP_201_CREATED,
 )
-async def add_cards(input_data: AddCardsInput):    
+async def add_cards(input_data: AddCardsInput):
     deckName = input_data.deckName or DEFAULT_DECK_NAME
     pairs = input_data.pairs
 
@@ -298,34 +298,25 @@ async def add_cards(input_data: AddCardsInput):
             status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs provided."
         )
 
-    pairs_status = []
+    results = []
     for pair in pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:
-            try:
-                anki_status = await anki_service.add_card(deckName, front, back)
-                pairs_status.append({
-                    "Status": anki_status,
-                    "Front": front,
-                    "Back": back,
-                })
-            except Exception as e:
-                logging.error(f"Error adding card for Front: {front}, Back: {back}. {str(e)}")
-                pairs_status.append({
-                    "Status": False,
-                    "Front": front,
-                    "Back": back,
-                })
+            response = await anki_service.add_card(deckName, front, back)
+            if not response["success"]:
+                results.append(
+                    {
+                        "Status": False,
+                        "Front": front,
+                        "Back": back,
+                        "Error": response.get("error", "Unknown error occurred."),
+                    }
+                )
+            else:
+                results.append({"Status": True, "Front": front, "Back": back})
 
-    # If no cards were successfully processed, return a detailed error
-    if not pairs_status:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No valid cards could be added.",
-        )
-
-    return {"status": pairs_status}
+    return {"status": results}
 
 
 
