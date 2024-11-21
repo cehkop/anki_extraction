@@ -1,311 +1,373 @@
 # backend/src/main.py
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    File,
+    UploadFile,
+    Form,
+    Depends,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 import os
 import dotenv
-import requests
-import shutil
-from typing import List
+import httpx
+from typing import List, Dict, Any
 import logging
+from io import BytesIO
+from pathlib import Path
+import asyncio
 
-from src.utils import image_to_base64
+from src.utils import image_to_base64, read_and_validate_image
 from src.processing import extract_pairs_from_text, extract_pairs_from_image
+from src.anki import get_anki_client, add_card_to_anki, get_decks_from_anki
 
-logging.basicConfig(level=logging.INFO, 
-                    format="%(asctime)s - %(levelname)s - %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S",
-                    filename="logs.txt",
-                    filemode="a"
-                    )
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    filename="logs.txt",
+    filemode="a",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 dotenv.load_dotenv()
 
-# Define the Anki-Connect endpoint
-ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+# Define the Anki-Connect endpoint and default deck name
+DEFAULT_DECK_NAME = os.getenv("DEFAULT_DECK_NAME", "test")
 
-# Pydantic model for input
-class Input_Data(BaseModel):
-    text: str
-    deckName: str 
-    
-    
+# Pydantic models
+class InputData(BaseModel):
+    text: str = Field(..., description="Text to process")
+    deckName: str = Field(..., description="Anki deck name")
+
+    @validator("deckName")
+    def deck_name_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError("deckName cannot be empty")
+        return v
+
+
 class ExtractTextInput(BaseModel):
     text: str
 
+
 class AddCardsInput(BaseModel):
     deckName: str
-    pairs: List[dict]
+    pairs: List[Dict[str, Any]]
 
 
-# Function to add a card to Anki
-def add_card_to_anki(deckName: str, front: str, back: str):
-    payload = {
-        "action": "addNote",
-        "version": 6,
-        "params": {
-            "note": {
-                "deckName": deckName,
-                "modelName": "Основная (с обратной карточкой)",
-                "fields": {"Лицо": front, "Оборот": back},
-                "options": {
-                    "allowDuplicate": False,
-                    "duplicateScopeOptions": {
-                        "checkChildren": True,
-                        "checkAllModels": True,
-                    },
-                },
-                "tags": [],
-            }
-        },
-    }
-    try:
-        response = requests.post(ANKI_CONNECT_URL, json=payload).json()
-    except requests.exceptions.RequestException as e:
-        print(f"Seems like Anki or AnkiConnect is not running: {e}")
-        return False
-
-    if response.get("error"):
-        print(f"Error adding card: {response['error']}")
-        return False
-    else:
-        print(f"Added card: {front} - {back}")
-    return True
+class CardStatus(BaseModel):
+    Status: bool
+    Front: str
+    Back: str
 
 
-# API endpoint
-@app.post("/process_text")
-async def process_text(input_data: Input_Data):
+class DecksResponse(BaseModel):
+    decks: List[str]
+
+
+# API endpoint to process text
+@app.post(
+    "/process_text",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+)
+async def process_text(
+    input_data: InputData, anki_client: httpx.AsyncClient = Depends(get_anki_client)
+):
     text = input_data.text
-    deckName = input_data.deckName
-    if not deckName:
-        deckName = "test"
+    deckName = input_data.deckName or DEFAULT_DECK_NAME
 
-    logging.info("Processing text. Deck name: %s", deckName)
-    logging.info("Text: %s", text)
+    logger.info("Processing text. Deck name: %s", deckName)
+    logger.info("Text: %s", text)
 
     if not text:
-        raise HTTPException(status_code=400, detail="No text provided.")
-    
-    # Step 1: Process text with OpenAI API
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No text provided."
+        )
+
+    # Await the asynchronous extract_pairs_from_text
     pairs = await extract_pairs_from_text(text)
 
     if not pairs:
-        raise HTTPException(status_code=400, detail="No pairs extracted.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs extracted."
+        )
 
-    # Step 2: Add pairs to Anki
+    # Add pairs to Anki
     pairs_status = []
     for pair in pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:
-            status = add_card_to_anki(deckName, front, back)
-            pairs_status.append({"Status": status, "Front": front, "Back": back})
+            try:
+                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                pairs_status.append({"Status": anki_status, "Front": front, "Back": back})
+            except Exception as e:
+                logging.error(f"Error adding card for Front: {front}, Back: {back}. {str(e)}")
+                pairs_status.append({"Status": False, "Front": front, "Back": back})
+
     return {"status": pairs_status}
 
 
-# Function to process all images in a folder
-@app.post("/process_images")
-async def process_images(files: List[UploadFile] = File(...),
-                         deckName: str = Form(...)):
-    images_folder = "uploaded_images"
-    os.makedirs(images_folder, exist_ok=True)
-
-    logging.info("Processing images...")
-    logging.info("Deck name: %s", deckName)
-
+# Endpoint to process multiple images
+@app.post(
+    "/process_images",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+)
+async def process_images(
+    files: List[UploadFile] = File(...),
+    deckName: str = Form(...),
+    anki_client: httpx.AsyncClient = Depends(get_anki_client),
+):
     if not files:
-        raise HTTPException(status_code=400, detail="No files uploaded.")
-    results = []
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No files uploaded."
+        )
 
-    for file in files:
-        # Validate the uploaded file
-        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-            raise HTTPException(status_code=400, detail=f"Invalid image type: {file.filename}")
+    deckName = deckName or DEFAULT_DECK_NAME
 
-        # Limit file size 5MB
-        file_size = await file.read()
-        if len(file_size) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail=f"File too large: {file.filename}")
-        # Reset the file pointer after reading
-        await file.seek(0)
+    logger.info("Processing images...")
+    logger.info("Deck name: %s", deckName)
 
-        # Save the uploaded image
-        file_path = os.path.join(images_folder, file.filename)
+    async def process_single_image(file: UploadFile):
+        filename = Path(file.filename).name
         try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            content = await read_and_validate_image(file)
+            base64_image = image_to_base64(BytesIO(content))
+
+            # Await the asynchronous extract_pairs_from_image
+            pairs = await extract_pairs_from_image(base64_image, image_caption=filename)
+            logger.info("Pairs extracted from %s: %s", filename, pairs)
+
+            if not pairs:
+                return {
+                    "Image": filename,
+                    "Status": False,
+                    "Detail": "No pairs extracted from the image.",
+                }
+
+            # Add pairs to Anki
+            pairs_status = []
+            for pair in pairs:
+                front = pair.get("Front")
+                back = pair.get("Back")
+                if front and back:
+                    anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                    pairs_status.append(CardStatus(Status=anki_status, Front=front, Back=back)
+                    )
+
+            return {
+                "Image": filename,
+                "Status": True,
+                "Pairs": pairs_status,
+            }
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save image {file.filename}: {e}")
-
-        # Convert the image to base64
-        base64_image = image_to_base64(file_path)
-
-        # Process the image with OpenAI API
-        pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
-        logging.info("Pairs extracted: %s", pairs)
-        if not pairs:
-            results.append({
-                "Image": file.filename,
+            logger.exception(f"Failed to process image {filename}")
+            return {
+                "Image": filename,
                 "Status": False,
-                "Detail": "No pairs extracted from the image."
-            })
-            continue
+                "Detail": f"Failed to process image: {str(e)}",
+            }
+
+    # Process images in parallel
+    results = await asyncio.gather(*(process_single_image(file) for file in files))
+
+    return {"pairs": results}
+
+
+# Endpoint to upload an image and process it
+@app.post(
+    "/upload_image",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_image(
+    file: UploadFile = File(...),
+    deckName: str = Form(DEFAULT_DECK_NAME),
+    anki_client: httpx.AsyncClient = Depends(get_anki_client),
+):
+    filename = Path(file.filename).name
+
+    try:
+        content = await read_and_validate_image(file)
+        base64_image = image_to_base64(BytesIO(content))
+
+        # Assuming extract_pairs_from_image is synchronous
+        pairs = await asyncio.to_thread(
+            extract_pairs_from_image, base64_image, image_caption=filename
+        )
+        logger.info("Pairs extracted from %s: %s", filename, pairs)
+
+        if not pairs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No pairs extracted from the image.",
+            )
 
         # Add pairs to Anki
-        if not deckName:
-            deckName = "test"  # Replace with your actual deck name
         pairs_status = []
         for pair in pairs:
             front = pair.get("Front")
             back = pair.get("Back")
             if front and back:
-                status = add_card_to_anki(deckName, front, back)
-                pairs_status.append({
-                    "Status": status,
-                    "Front": front,
-                    "Back": back
-                })
-        results.append({
-            "Image": file.filename,
-            "Status": True,
-            "Pairs": pairs_status
-        })
+                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                pairs_status.append(CardStatus(Status=anki_status, Front=front, Back=back))
 
-    return {"results": results}
-
-
-# Endpoint to upload an image and process it
-@app.post("/upload_image")
-async def upload_image(file: UploadFile = File(...)):
-    # Define the folder to save images
-    images_folder = "uploaded_images"
-    os.makedirs(images_folder, exist_ok=True)
-
-    # Save the uploaded image to the folder
-    file_path = os.path.join(images_folder, file.filename)
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        return {"status": pairs_status}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save image: {e}")
-
-    # Convert the image to base64
-    base64_image = image_to_base64(file_path)
-
-    # Process the image with OpenAI API
-    pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
-    logging.info("Pairs extracted: %s", pairs)
-
-    if not pairs:
-        raise HTTPException(status_code=400, detail="No pairs extracted from the image.")
-
-    # Add pairs to Anki
-    deckName = "test"  # Replace with your actual deck name
-    pairs_status = []
-    for pair in pairs:
-        front = pair.get("Front")
-        back = pair.get("Back")
-        if front and back:
-            status = add_card_to_anki(deckName, front, back)
-            pairs_status.append({"Status": status, "Front": front, "Back": back})
-
-    return {"status": pairs_status}
-
-
-# Function to get decks from Anki
-def get_decks_from_anki():
-    payload = {
-        "action": "deckNames",
-        "version": 6
-    }
-    try:
-        response = requests.post(ANKI_CONNECT_URL, json=payload).json()
-        if response.get("error"):
-            return None
-        return response.get("result", [])
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching decks: {e}")
-        return None
+        logger.exception(f"Failed to process image {filename}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process image: {str(e)}",
+        )
 
 
 # Endpoint to get all decks
-@app.get("/get_decks")
-async def get_decks():
-    decks = get_decks_from_anki()
+@app.get("/get_decks", response_model=DecksResponse)
+async def get_decks(anki_client: httpx.AsyncClient = Depends(get_anki_client)):
+    decks = await get_decks_from_anki(anki_client)
     if decks is None:
-        raise HTTPException(status_code=500, detail="Failed to fetch decks from Anki.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch decks from Anki.",
+        )
     return {"decks": decks}
 
 
 # Extract pairs from text
-@app.post("/extract_text")
+@app.post(
+    "/extract_text",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+)
 async def extract_text(input_data: ExtractTextInput):
     text = input_data.text
     if not text:
-        raise HTTPException(status_code=400, detail="No text provided.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No text provided."
+        )
+
+    # Await the asynchronous function
     pairs = await extract_pairs_from_text(text)
-    logging.info("Pairs extracted: %s", pairs)
+    logger.info("Pairs extracted: %s", pairs)
+    
     if not pairs:
-        raise HTTPException(status_code=400, detail="No pairs extracted.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs extracted."
+        )
+    
     return {"pairs": pairs}
 
 
 # Add selected cards to Anki
-@app.post("/add_cards")
-async def add_cards(input_data: AddCardsInput):
-    deckName = input_data.deckName
+@app.post(
+    "/add_cards",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_cards(
+    input_data: AddCardsInput, anki_client: httpx.AsyncClient = Depends(get_anki_client)
+):    
+    deckName = input_data.deckName or DEFAULT_DECK_NAME
     pairs = input_data.pairs
-    if not deckName:
-        deckName = "test"
+
     if not pairs:
-        raise HTTPException(status_code=400, detail="No pairs provided.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs provided."
+        )
+
     pairs_status = []
     for pair in pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:
-            status = add_card_to_anki(deckName, front, back)
-            pairs_status.append({"Status": status, "Front": front, "Back": back})
+            try:
+                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                pairs_status.append({
+                    "Status": anki_status,
+                    "Front": front,
+                    "Back": back,
+                })
+            except Exception as e:
+                logging.error(f"Error adding card for Front: {front}, Back: {back}. {str(e)}")
+                pairs_status.append({
+                    "Status": False,
+                    "Front": front,
+                    "Back": back,
+                })
+
+    # If no cards were successfully processed, return a detailed error
+    if not pairs_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid cards could be added.",
+        )
+
     return {"status": pairs_status}
 
 
-# Extract pairs from images
-@app.post("/extract_images")
-async def extract_images(files: List[UploadFile] = File(...)):
-    images_folder = "uploaded_images"
-    os.makedirs(images_folder, exist_ok=True)
 
+# Extract pairs from images
+@app.post(
+    "/extract_images",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+)
+async def extract_images(files: List[UploadFile] = File(...)):
     if not files:
-        raise HTTPException(status_code=400, detail="No files uploaded.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No files uploaded."
+        )
+
+    logger.info("Count of files: %s", len(files))
 
     all_pairs = []
-    logging.info("Count of files: %s", len(files))
-    for file in files:
-        # Validate and save the uploaded image
-        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-            raise HTTPException(status_code=400, detail=f"Invalid image type: {file.filename}")
-        file_path = os.path.join(images_folder, file.filename)
+
+    async def extract_pairs_from_single_image(file: UploadFile):
+        filename = file.filename
         try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            content = await read_and_validate_image(file)
+            binary_stream = BytesIO(content)  # Convert content to BytesIO
+            base64_image = image_to_base64(binary_stream)  # Pass binary stream
+
+            # Await the asynchronous extract_pairs_from_image
+            pairs = await extract_pairs_from_image(base64_image, image_caption=filename)
+            logger.info("Pairs extracted from %s: %s", filename, pairs)
+
+            return [
+                {
+                    "Status": True,
+                    "Front": pair.get("Front"),
+                    "Back": pair.get("Back"),
+                }
+                for pair in pairs
+            ] if pairs else []
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save image {file.filename}: {e}")
+            logger.exception(f"Failed to process image {filename}")
+            return []
 
-        # Convert the image to base64
-        base64_image = image_to_base64(file_path)
+    # Process images in parallel
+    results = await asyncio.gather(
+        *(extract_pairs_from_single_image(file) for file in files)
+    )
 
-        # Extract pairs from the image
-        pairs = await extract_pairs_from_image(base64_image, image_caption=file.filename)
-        logging.info("Pairs extracted: %s", pairs)
-        if pairs:
-            all_pairs.extend(pairs)
+    # Flatten list of pairs from all images
+    for image_pairs in results:
+        all_pairs.extend(image_pairs)
 
     if not all_pairs:
-        raise HTTPException(status_code=400, detail="No pairs extracted from images.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pairs extracted from images.",
+        )
 
     return {"pairs": all_pairs}
 
@@ -313,8 +375,8 @@ async def extract_images(files: List[UploadFile] = File(...)):
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify your frontend's URL
+    allow_origins=["http://localhost:2342"],  # Use the exact frontend origin
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Explicitly allow OPTIONS
+    allow_headers=["Content-Type", "Authorization"],  # Adjust as needed
 )
