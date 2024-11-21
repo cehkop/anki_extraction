@@ -22,7 +22,11 @@ import asyncio
 
 from src.utils import image_to_base64, read_and_validate_image
 from src.processing import extract_pairs_from_text, extract_pairs_from_image
-from src.anki import get_anki_client, add_card_to_anki, get_decks_from_anki
+from src.anki import AnkiService
+
+# Initialize AnkiService
+ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
+anki_service = AnkiService(ANKI_CONNECT_URL)
 
 # Configure logging
 logging.basicConfig(
@@ -79,7 +83,7 @@ class DecksResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
 )
 async def process_text(
-    input_data: InputData, anki_client: httpx.AsyncClient = Depends(get_anki_client)
+    input_data: InputData,
 ):
     text = input_data.text
     deckName = input_data.deckName or DEFAULT_DECK_NAME
@@ -107,7 +111,7 @@ async def process_text(
         back = pair.get("Back")
         if front and back:
             try:
-                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                anki_status = await anki_service.add_card(deckName, front, back)
                 pairs_status.append({"Status": anki_status, "Front": front, "Back": back})
             except Exception as e:
                 logging.error(f"Error adding card for Front: {front}, Back: {back}. {str(e)}")
@@ -125,7 +129,6 @@ async def process_text(
 async def process_images(
     files: List[UploadFile] = File(...),
     deckName: str = Form(...),
-    anki_client: httpx.AsyncClient = Depends(get_anki_client),
 ):
     if not files:
         raise HTTPException(
@@ -161,7 +164,7 @@ async def process_images(
                 back = pair.get("Back")
                 if front and back:
                     try:
-                        anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                        anki_status = await anki_service.add_card(deckName, front, back)
                         pairs_status.append({
                             "Status": anki_status,
                             "Front": front,
@@ -206,7 +209,6 @@ async def process_images(
 async def upload_image(
     file: UploadFile = File(...),
     deckName: str = Form(DEFAULT_DECK_NAME),
-    anki_client: httpx.AsyncClient = Depends(get_anki_client),
 ):
     filename = Path(file.filename).name
 
@@ -232,7 +234,7 @@ async def upload_image(
             front = pair.get("Front")
             back = pair.get("Back")
             if front and back:
-                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                anki_status = await anki_service.add_card(deckName, front, back)
                 pairs_status.append(CardStatus(Status=anki_status, Front=front, Back=back))
 
         return {"status": pairs_status}
@@ -246,8 +248,8 @@ async def upload_image(
 
 # Endpoint to get all decks
 @app.get("/get_decks", response_model=DecksResponse)
-async def get_decks(anki_client: httpx.AsyncClient = Depends(get_anki_client)):
-    decks = await get_decks_from_anki(anki_client)
+async def get_decks():
+    decks = await anki_service.get_decks()
     if decks is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -287,9 +289,7 @@ async def extract_text(input_data: ExtractTextInput):
     response_model=Dict[str, Any],
     status_code=status.HTTP_201_CREATED,
 )
-async def add_cards(
-    input_data: AddCardsInput, anki_client: httpx.AsyncClient = Depends(get_anki_client)
-):    
+async def add_cards(input_data: AddCardsInput):    
     deckName = input_data.deckName or DEFAULT_DECK_NAME
     pairs = input_data.pairs
 
@@ -304,7 +304,7 @@ async def add_cards(
         back = pair.get("Back")
         if front and back:
             try:
-                anki_status = await add_card_to_anki(anki_client, deckName, front, back)
+                anki_status = await anki_service.add_card(deckName, front, back)
                 pairs_status.append({
                     "Status": anki_status,
                     "Front": front,
@@ -385,6 +385,10 @@ async def extract_images(files: List[UploadFile] = File(...)):
 
     return {"pairs": all_pairs}
 
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await anki_service.client.aclose()
 
 # Add CORS middleware
 app.add_middleware(

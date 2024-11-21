@@ -9,6 +9,7 @@
 #   generate-hashes: false
 #   universal: false
 
+aiofiles==24.1.0
 aiohappyeyeballs==2.4.3
     # via aiohttp
 aiohttp==3.10.10
@@ -129,6 +130,7 @@ stack-data==0.6.3
     # via ipython
 starlette==0.41.0
     # via fastapi
+tenacity==9.0.0
 tornado==6.4.1
     # via ipykernel
     # via jupyter-client
