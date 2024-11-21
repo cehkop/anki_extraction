@@ -1,9 +1,8 @@
 import base64
 import os
 from io import BytesIO
-import imghdr
 from fastapi import UploadFile, HTTPException, status
-from pathlib import Path
+import aiofiles
 
 # Function to convert an image file to base64 format
 def image_to_base64(image):
@@ -23,24 +22,21 @@ def image_to_base64(image):
         raise TypeError("Expected a file path or BytesIO object.")
     
     
-
-# Helper function to validate and read uploaded image files
 async def read_and_validate_image(file: UploadFile) -> bytes:
-    filename = Path(file.filename).name  # Prevent directory traversal
+    # Validate the image content-type
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/webp"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Invalid image type: {file.filename}"
+        )
+
+    # Read the file content asynchronously
     content = await file.read()
+
     # Check file size (limit to 5MB)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large: {filename}",
+            detail=f"File too large: {file.filename}",
         )
-
-    # Validate image type
-    file_type = imghdr.what(None, h=content)
-    if file_type not in ["jpeg", "png", "jpg", "webp"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid image type: {filename}",
-        )
-
     return content
