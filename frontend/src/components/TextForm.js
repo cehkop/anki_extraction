@@ -17,31 +17,24 @@ function TextForm({ handleLog, deckName, processingMode }) {
       return;
     }
 
-    if (processingMode === 'auto') {
-      // Automatic Processing
-      try {
-        const res = await axios.post('http://localhost:2341/process_text', {
-          text,
-          deckName,
-        });
+    try {
+      const res = await axios.post('http://localhost:2341/text', {
+        text,
+        deckName,
+        mode: processingMode === 'auto' ? 'auto' : 'manual',
+      });
+
+      if (processingMode === 'auto') {
+        // Automatic Processing
         handleLog(`Text Response: ${JSON.stringify(res.data, null, 2)}`);
         setText(''); // Clear the input field
-      } catch (error) {
-        console.error(error);
-        handleLog('Error processing text.');
-      }
-    } else {
-      // Manual Processing - Extract pairs without clearing input initially
-      try {
-        const res = await axios.post('http://localhost:2341/extract_text', {
-          text,
-        });
-        console.log('Extracted pairs:', res.data.pairs);
+      } else {
+        // Manual Processing
         setExtractedPairs(res.data.pairs);
-      } catch (error) {
-        console.error(error);
-        handleLog('Error extracting pairs.');
       }
+    } catch (error) {
+      console.error(error);
+      handleLog('Error processing text.');
     }
   };
 

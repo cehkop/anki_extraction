@@ -23,45 +23,35 @@ function ImageUpload({ handleLog, deckName, processingMode }) {
       return;
     }
 
-    if (processingMode === 'auto') {
-      // Automatic Processing
-      const formData = new FormData();
-      selectedFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-      formData.append('deckName', deckName); // Include deckName in the form data
+    const formData = new FormData();
+    selectedFiles.forEach((file) => {
+      formData.append('files', file);
+    });
+    formData.append('deckName', deckName || ''); // Include deckName in the form data
+    formData.append('mode', processingMode === 'auto' ? 'auto' : 'manual'); // Include mode
 
-      try {
-        const res = await axios.post('http://localhost:2341/process_images', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
+    try {
+      const res = await axios.post('http://localhost:2341/images', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      if (processingMode === 'auto') {
+        // Automatic Processing
         fileInputRef.current.clear(); // Clear the input field
         setSelectedFiles([]);
         handleLog(`Image Response: ${JSON.stringify(res.data, null, 2)}`);
-      } catch (error) {
-        console.error(error);
-        handleLog('Error processing images.');
+      } else {
+        // Manual Processing
+        // Collect all pairs from all images
+        const allPairs = res.data.results.flatMap((imageResult) =>
+          imageResult.Pairs || []
+        );
+        setExtractedPairs(allPairs); // Set extracted pairs for manual review
       }
-    } else {
-      // Manual Processing
-      const formData = new FormData();
-      selectedFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-
-      try {
-        const res = await axios.post('http://localhost:2341/extract_images', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        setExtractedPairs(res.data.pairs); // Set extracted pairs for manual review
-      } catch (error) {
-        console.error(error);
-        handleLog('Error extracting pairs from images.');
-      }
+    } catch (error) {
+      console.error(error);
+      handleLog('Error processing images.');
     }
   };
 
