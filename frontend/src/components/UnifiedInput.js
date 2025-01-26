@@ -1,3 +1,5 @@
+// src/components/UnifiedInput.js
+
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
@@ -106,7 +108,14 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
     }
   };
 
-  const handleClear = () => {
+  const handleManualCardsClear = () => {
+    // setInputText('');
+    setSelectedFiles([]);
+    setExtractedPairs(null);
+    // fileInputRef.current.clear();
+  };
+  
+  const handleAllClear = () => {
     setInputText('');
     setSelectedFiles([]);
     setExtractedPairs(null);
@@ -166,7 +175,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
           <Button variant="contained" type="submit">
             Submit
           </Button>
-          <Button variant="outlined" color="error" onClick={handleClear}>
+          <Button variant="outlined" color="error" onClick={handleAllClear}>
             Clear
           </Button>
         </Box>
@@ -175,7 +184,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
           <ManualCardReview
             pairs={extractedPairs}
             onSubmit={handleManualSubmit}
-            onCancel={handleClear}
+            onCancel={handleManualCardsClear}
           />
         </Box>
       )}

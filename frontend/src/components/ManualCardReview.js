@@ -1,3 +1,5 @@
+// src/components/ManualCardReview.js
+
 import React, { useState, useEffect } from 'react';
 import { Box, Checkbox, Button, Typography, FormControlLabel } from '@mui/material';
 

@@ -1,5 +1,3 @@
-// src/components/Log.js
-
 import React, { useEffect, useRef } from 'react';
 import { Paper, Typography, Box } from '@mui/material';
 
@@ -58,30 +56,30 @@ function Log({ logs }) {
 
             if (isJson && parsedLog) {
               // 1) Check if we have `cards` in the response
-              if (parsedLog.cards) {
-                // Determine if at least one card has a non-empty Status
-                const showCards = parsedLog.cards.some((card) => card.Status && card.Status.trim() !== '');
-                // If *no* card has a Status, it's likely manual mode => skip display
-                if (!showCards) {
-                  return null; // Don't show anything in the log
+              if (parsedLog.cards && Array.isArray(parsedLog.cards)) {
+                // Filter out cards with the specific "Anki is not running..." status
+                const filteredCards = parsedLog.cards.filter(
+                  (card) =>
+                    card.Status &&
+                    card.Status.trim() !== 'Anki is not running. Please launch Anki and ensure AnkiConnect is enabled.'
+                );
+            
+                // If no cards are left after filtering, skip rendering this log
+                if (filteredCards.length === 0) {
+                  return null; // No cards to display
                 }
-
-                // Otherwise, display only the cards that do have a Status
+            
+                // Render the filtered cards
                 return (
                   <Box key={index} sx={{ mb: 2 }}>
                     <Typography variant="subtitle2" sx={{ fontSize: '0.75rem', color: '#fff' }}>
                       {log.startsWith('Added Cards:') ? 'Added Cards' : 'Cards'}
                     </Typography>
-                    {parsedLog.cards.map((card, cardIndex) => {
+                    {filteredCards.map((card, cardIndex) => {
                       // If card.Status is "OK", color = green; otherwise red
                       const isSuccess = card.Status === 'OK';
                       const bgColor = isSuccess ? '#003300' : '#330000';
-
-                      // If card.Status is empty/undefined, we skip it entirely
-                      if (!card.Status || !card.Status.trim()) {
-                        return null;
-                      }
-
+            
                       return (
                         <Box
                           key={cardIndex}
@@ -115,13 +113,13 @@ function Log({ logs }) {
                   </Box>
                 );
               }
-
+            
               // 2) Fallback if the parsed JSON doesn't have `cards`
               return (
                 <Typography key={index} variant="body2" sx={{ fontSize: '0.65rem', color: '#ccc' }}>
                   {log}
                 </Typography>
-              );
+              );            
             } else {
               // Non-JSON logs
               return (
