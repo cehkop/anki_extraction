@@ -31,6 +31,8 @@ dev-dependencies = [
     "ipykernel>=6.29.5",
     "aiohttp>=3.10.8",
     "nest-asyncio>=1.6.0",
+    "notebook>=7.2.2",
+    "ipython>=8.29.0",
 ]
 
 [tool.hatch.metadata]

@@ -19,8 +19,8 @@ from pathlib import Path
 import asyncio
 from typing import Dict, List, Any
 
-from src.utils import image_to_base64, read_and_validate_image
-from src.processing import extract_pairs_from_text, extract_pairs_from_image
+from src.utils import image_to_base64, read_and_validate_image, process_sound_tags
+from src.processing import extract_pairs_from_text, extract_pairs_from_image, change_anki_pairs
 from src.anki import AnkiService
 
 dotenv.load_dotenv()
@@ -57,17 +57,28 @@ class TextInput(BaseModel):
         return v
 
 class CardStatus(BaseModel):
-    Status: bool
+    Status: bool = False
     Front: str
     Back: str
     Error: str = None
     
+class CardBase(BaseModel):
+    Front: str
+    Back: str
+    
 class AddCardsInput(BaseModel):
     deckName: str
     pairs: List[Dict[str, Any]]
+    
+class AddCardsInputParseText(BaseModel):
+    deckName: str
+    pairs: str
 
 class DecksResponse(BaseModel):
     decks: List[str]
+    
+class GetCardsResponse(BaseModel):
+    cards: List[CardStatus]
 
 # Consolidated text endpoint
 @app.post(
@@ -244,6 +255,139 @@ async def add_cards(input_data: AddCardsInput):
 
     results = []
     for pair in pairs:
+        front = pair.get("Front")
+        back = pair.get("Back")
+        if front and back:
+            response = await anki_service.add_card(deckName, front, back)
+            if not response["success"]:
+                results.append(
+                    {
+                        "Status": False,
+                        "Front": front,
+                        "Back": back,
+                        "Error": response.get("error", "Unknown error occurred."),
+                    }
+                )
+            else:
+                results.append({"Status": True, "Front": front, "Back": back})
+
+    return {"status": results}
+
+
+@app.get("/get_cards_red", response_model=List[CardBase])
+async def get_cards_red(deck_name: str):
+    red_cards_list = await anki_service.get_cards_red(deck_name)
+    return process_sound_tags(red_cards_list)
+
+
+@app.get("/update_cards_red_auto", response_model=GetCardsResponse)
+async def update_cards_red_auto(deck_name: str):
+    """
+    Automatically updates all red cards in a specified Anki deck.
+
+    Args:
+        deck_name (str): The name of the Anki deck to update.
+
+    Returns:
+        GetCardsResponse: A list of status updates for each processed card.
+    """
+    # Example: Fetching red cards (replace with actual logic)
+    red_cards = await get_cards_red(deck_name)
+    print(f'red cards: {red_cards}')
+    batch_size = 10
+    results = []
+
+    for i in range(0, len(red_cards), batch_size):
+        batch = red_cards[i:i + batch_size]
+        print(f'batch: {batch}')
+        batch_processed = await change_anki_pairs(batch)
+        print(f'batch processed: {batch_processed}')
+        for pair in batch_processed:
+            front = pair.get("Front")
+            back = pair.get("Back")
+            if front and back:
+                response = await anki_service.add_card(deck_name, front, back)
+                if not response["success"]:
+                    results.append(
+                        {
+                            "Status": False,
+                            "Front": front,
+                            "Back": back,
+                            "Error": response.get("error", "Unknown error occurred."),
+                        }
+                    )
+                else:
+                    results.append({"Status": True, "Front": front, "Back": back})
+    print(f'cards: {results}')
+    return {"cards": results}
+
+
+@app.get("/update_cards_red_manual", response_model=GetCardsResponse)
+async def update_cards_red_manual(input_data: AddCardsInput):
+    """
+    Manually updates specified red cards in batches.
+
+    Args:
+        input_data (AddCardsInput): Input containing the deck name and card pairs.
+
+    Returns:
+        GetCardsResponse: A list of status updates for each processed card.
+    """
+    deckName = input_data.deckName or DEFAULT_DECK_NAME
+    pairs = input_data.pairs
+    batch_size = 10
+    results = []
+
+    for i in range(0, len(pairs), batch_size):
+        batch = pairs[i:i + batch_size]
+        for pair in batch:
+            front = pair.get("Front")
+            back = pair.get("Back")
+            if front and back:
+                response = await anki_service.add_card(deckName, front, back)
+                if not response["success"]:
+                    results.append(
+                        {
+                            "Status": False,
+                            "Front": front,
+                            "Back": back,
+                            "Error": response.get("error", "Unknown error occurred."),
+                        }
+                    )
+                else:
+                    results.append({"Status": True, "Front": front, "Back": back})
+
+    return {"status": results}
+
+
+@app.post("/full_manual_add_cards")
+async def full_manual_add_cards(input_data: AddCardsInputParseText):
+    """
+    Parses raw text pairs and adds them to Anki.
+
+    Args:
+        input_data (AddCardsInputParseText): Raw text pairs to parse and process.
+
+    Returns:
+        GetCardsResponse: A list of status updates for each processed card.
+    """
+    deckName = input_data.deckName or DEFAULT_DECK_NAME
+    raw_pairs = input_data.pairs
+    parsed_pairs = []
+
+    # Parse raw pairs into structured dictionary
+    try:
+        lines = raw_pairs.splitlines()
+        for i in range(0, len(lines), 2):
+            front = lines[i].replace("Front:", "").strip()
+            back = lines[i + 1].replace("Back:", "").strip()
+            parsed_pairs.append({"Front": front, "Back": back})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing pairs: {e}")
+
+    # Process pairs
+    results = []
+    for pair in parsed_pairs:
         front = pair.get("Front")
         back = pair.get("Back")
         if front and back:

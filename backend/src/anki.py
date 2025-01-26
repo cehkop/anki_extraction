@@ -46,6 +46,7 @@ class AnkiService:
                     "options": {
                         "allowDuplicate": False,
                         "duplicateScopeOptions": {
+                            "deckName": deck_name,
                             "checkChildren": True,
                             "checkAllModels": True,
                         },
@@ -104,3 +105,88 @@ class AnkiService:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return {"success": False, "error": f"Unexpected error: {e}"}
+    
+    @retry(
+        wait=wait_fixed(2),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(ConnectError),
+        reraise=True,
+    )
+    async def get_cards_red(self, deck_name: str) -> List[Dict[str, Any]]:
+        if not await self.is_anki_running():
+            return []
+        
+        red_cards_ids = await self.get_cards_ids_red(deck_name)
+        # print(red_cards_ids)
+        red_cards_info = await self.get_cards_by_ids(red_cards_ids)
+        # print(red_cards_info)
+        
+        red_cards_info_main = []
+        try:
+            for card in red_cards_info:
+                if card.get("fields", {}).get("Лицо") and card.get("fields", {}).get("Оборот"):
+                    card_info_main = {'Front': card.get("fields").get("Лицо").get("value"), 'Back': card.get("fields").get("Оборот").get("value")}
+                    red_cards_info_main.append(card_info_main)
+            # print(red_cards_info_main)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+        return red_cards_info_main
+        
+    @retry(
+        wait=wait_fixed(2),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(ConnectError),
+        reraise=True,
+    )
+    async def get_cards_by_ids(self, card_ids: List[int]) -> List[Dict[str, Any]]:
+        if not await self.is_anki_running():
+            return []
+        payload = {
+            "action": "cardsInfo",
+            "version": 6,
+            "params": {"cards": card_ids},
+        }
+        try:
+            response = await self.client.post("/", json=payload, timeout=5.0)
+            response.raise_for_status()
+            response_json = response.json()
+            if response_json.get("error"):
+                logger.error(f"Error fetching cards: {response_json['error']}")
+                return []
+            return response_json.get("result", [])
+        except ConnectError as e:
+            logger.error(f"AnkiConnect connection failed: {e}")
+            return []
+        except httpx.RequestError as e:
+            logger.error(f"AnkiConnect request failed: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return []
+        
+    async def get_cards_ids_red(self, deck_name: str) -> List[int]:
+        if not await self.is_anki_running():
+            return []
+        payload = {
+            "action": "findCards",
+            "version": 6,
+            "params": {"query": f"deck:{deck_name} flag:1"},
+        }
+        try:
+            response = await self.client.post("/", json=payload, timeout=5.0)
+            response.raise_for_status()
+            response_json = response.json()
+            if response_json.get("error"):
+                logger.error(f"Error fetching cards: {response_json['error']}")
+                return []
+            return response_json.get("result", [])
+        except ConnectError as e:
+            logger.error(f"AnkiConnect connection failed: {e}")
+            return []
+        except httpx.RequestError as e:
+            logger.error(f"AnkiConnect request failed: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return []
+
