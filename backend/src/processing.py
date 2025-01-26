@@ -21,19 +21,19 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
 
 # Asynchronous function to process text with OpenAI API
 async def extract_pairs_from_text(text: str):
-    # return [{"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."}]
+    return [{"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."}]
     prompt = (
         "You are a perfect English teacher. Teacher are very helpful. Teacher helps me to learn English. "
         "I use Anki cards to learn English and I need teacher help. My main language is Russian. "
@@ -133,20 +133,20 @@ async def extract_pairs_from_text(text: str):
     
 # Asynchronous function to process image with OpenAI API
 async def extract_pairs_from_image(base64_image, image_caption=""):    
-    # return [{"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."}]
+    return [{"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."}]
     """Send an image and caption to OpenAI for structured processing and return extracted information."""
     try:
         user_content = [

@@ -17,7 +17,7 @@ import logging
 from io import BytesIO
 from pathlib import Path
 import asyncio
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from src.utils import image_to_base64, read_and_validate_image
 from src.processing import extract_pairs_from_text, extract_pairs_from_image
@@ -43,224 +43,130 @@ ANKI_CONNECT_URL = os.getenv("ANKI_CONNECT_URL", "http://localhost:8765")
 
 # Initialize AnkiService
 anki_service = AnkiService(ANKI_CONNECT_URL)
-
-# Pydantic models
-class TextInput(BaseModel):
-    text: str = Field(..., description="Text to process")
-    deckName: str = Field(None, description="Anki deck name")
-    mode: str = Field('auto', description="Mode of operation: 'auto' or 'manual'")
-
-    @validator("mode")
-    def validate_mode(cls, v):
-        if v not in ('auto', 'manual'):
-            raise ValueError("Mode must be 'auto' or 'manual'")
-        return v
-
-class CardStatus(BaseModel):
-    Status: bool
-    Front: str
-    Back: str
-    Error: str = None
     
+# Each card has Front, Back, and an optional Status (holding "OK" or the error message).
+class CardModel(BaseModel):
+    Front: str = Field(..., description="Front text of the card")
+    Back: str = Field(..., description="Back text of the card")
+    Status: Optional[str] = Field(None, description="OK if added successfully, or error message")
+
+# The request body for /add_cards
 class AddCardsInput(BaseModel):
-    deckName: str
-    pairs: List[Dict[str, Any]]
+    deckName: Optional[str] = Field(None, description="Anki deck name")
+    pairs: List[CardModel] = Field(..., description="List of cards to add")
+
+# The unified response model for both /process and /add_cards
+class CardsResponse(BaseModel):
+    cards: List[CardModel] = Field(..., description="List of processed cards with optional status")
 
 class DecksResponse(BaseModel):
     decks: List[str]
 
-# Consolidated text endpoint
-@app.post(
-    "/text",
-    response_model=Dict[str, Any],
-    status_code=status.HTTP_200_OK,
-)
-async def handle_text(
-    input_data: TextInput,
-):
-    text = input_data.text
-    deckName = input_data.deckName or DEFAULT_DECK_NAME
-    mode = input_data.mode
 
-    logger.info(f"Handling text in mode '{mode}'. Deck name: {deckName}")
-    logger.info("Text: %s", text)
-
-    if not text:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No text provided."
-        )
-
-    # Extract pairs from text
-    pairs = await extract_pairs_from_text(text)
-
-    if not pairs:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs extracted."
-        )
-
-    if mode == 'manual':
-        # Return the extracted pairs without adding to Anki
-        return {"pairs": pairs}
-
-    elif mode == 'auto':
-        # Add pairs to Anki
-        results = []
-        for pair in pairs:
-            front = pair.get("Front")
-            back = pair.get("Back")
-            if front and back:
-                response = await anki_service.add_card(deckName, front, back)
-                if not response["success"]:
-                    results.append(
-                        {
-                            "Status": False,
-                            "Front": front,
-                            "Back": back,
-                            "Error": response.get("error", "Unknown error occurred."),
-                        }
-                    )
-                else:
-                    results.append({"Status": True, "Front": front, "Back": back})
-        return {"status": results}
-
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid mode. Use 'auto' or 'manual'."
-        )
-
-# Consolidated images endpoint
-@app.post(
-    "/images",
-    response_model=Dict[str, Any],
-    status_code=status.HTTP_200_OK,
-)
-async def handle_images(
-    request: Request,
-    files: List[UploadFile] = File(...),
-    deckName: str = Form(None),
-    mode: str = Form('manual'),
-):
+# Consolidated endpoint
+@app.post("/process", response_model=CardsResponse, status_code=status.HTTP_200_OK)
+async def handle_process(
+    text: Optional[str] = Form(None),
+    files: List[UploadFile] = File([]),
+    deckName: Optional[str] = Form(None),
+    mode: str = Form("manual"),
+) -> CardsResponse:
+    """
+    Single endpoint for text + images:
+      - manual => {"cards":[{Front, Back, Status=None}, ...]}
+      - auto   => {"cards":[{Front, Back, Status='OK' or 'Error'}, ...]}
+    """
     deckName = deckName or DEFAULT_DECK_NAME
 
-    if mode not in ('auto', 'manual'):
+    if mode not in ("manual", "auto"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid mode. Use 'auto' or 'manual'."
         )
 
-    if not files:
+    all_cards: List[CardModel] = []
+
+    # 1) Extract from text (if provided)
+    if text and text.strip():
+        logger.info(f"Extracting pairs from text (mode={mode}, deck={deckName}).")
+        text_pairs = await extract_pairs_from_text(text)
+        # Convert each extracted pair to CardModel (Status=None by default)
+        for p in text_pairs:
+            all_cards.append(CardModel(Front=p["Front"], Back=p["Back"]))
+
+    # 2) Extract from images (if provided)
+    if files:
+        logger.info(f"Extracting pairs from {len(files)} images (mode={mode}, deck={deckName}).")
+
+        async def process_image(upload: UploadFile):
+            try:
+                content = await read_and_validate_image(upload)
+                base64_img = image_to_base64(BytesIO(content))
+                pairs = await extract_pairs_from_image(base64_img, image_caption=upload.filename)
+                # Return list of CardModel
+                return [CardModel(Front=p["Front"], Back=p["Back"]) for p in pairs]
+            except Exception as e:
+                logger.exception(f"Failed to process image {upload.filename}: {e}")
+                return []
+
+        image_cards_lists = await asyncio.gather(*(process_image(f) for f in files))
+        for cards_list in image_cards_lists:
+            all_cards.extend(cards_list)
+
+    if not all_cards:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No files uploaded."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No cards extracted from text or images."
         )
 
-    logger.info(f"Handling images in mode '{mode}'. Deck name: {deckName}")
+    # 3) If 'manual', just return them with Status=None
+    if mode == "manual":
+        return CardsResponse(cards=all_cards)
 
-    async def process_single_image(file: UploadFile):
-        filename = Path(file.filename).name
-        try:
-            content = await read_and_validate_image(file)
-            base64_image = image_to_base64(BytesIO(content))
+    # 4) If 'auto', add to Anki & update Status
+    for card in all_cards:
+        response = await anki_service.add_card(deckName, card.Front, card.Back)
+        if not response["success"]:
+            card.Status = response.get("error", "Unknown error occurred.")
+        else:
+            card.Status = "OK"
 
-            # Process the image
-            pairs = await extract_pairs_from_image(base64_image, image_caption=filename)
-            logger.info("Pairs extracted from %s: %s", filename, pairs)
-
-            if not pairs:
-                return {
-                    "Image": filename,
-                    "Status": False,
-                    "Detail": "No pairs extracted from the image.",
-                }
-
-            if mode == 'manual':
-                # Return the extracted pairs without adding to Anki
-                return {
-                    "Image": filename,
-                    "Status": True,
-                    "Pairs": pairs,
-                }
-
-            elif mode == 'auto':
-                # Add pairs to Anki
-                pairs_status = []
-                for pair in pairs:
-                    front = pair.get("Front")
-                    back = pair.get("Back")
-                    if front and back:
-                        response = await anki_service.add_card(deckName, front, back)
-                        if not response["success"]:
-                            pairs_status.append({
-                                "Status": False,
-                                "Front": front,
-                                "Back": back,
-                                "Error": response.get("error", "Unknown error occurred."),
-                            })
-                        else:
-                            pairs_status.append({"Status": True, "Front": front, "Back": back})
-
-                return {
-                    "Image": filename,
-                    "Status": True,
-                    "Pairs": pairs_status,
-                }
-
-            else:
-                # Should not reach here due to earlier validation
-                return {
-                    "Image": filename,
-                    "Status": False,
-                    "Detail": "Invalid mode.",
-                }
-
-        except Exception as e:
-            logger.exception(f"Failed to process image {filename}")
-            return {
-                "Image": filename,
-                "Status": False,
-                "Detail": f"Failed to process image: {str(e)}",
-            }
-
-    # Process images in parallel
-    results = await asyncio.gather(*(process_single_image(file) for file in files))
-
-    return {"results": results}
+    return CardsResponse(cards=all_cards)
 
 
 # Add selected cards to Anki
-@app.post(
-    "/add_cards",
-    response_model=Dict[str, Any],
-    status_code=status.HTTP_201_CREATED,
-)
-async def add_cards(input_data: AddCardsInput):
+@app.post("/add_cards", response_model=CardsResponse, status_code=status.HTTP_201_CREATED)
+async def add_cards(input_data: AddCardsInput) -> CardsResponse:
+    """
+    Adds selected cards to Anki. 
+    Request body: { "deckName": "...", "pairs": [ {Front, Back}, ... ] }
+    Response body: { "cards": [ {Front, Back, Status="OK" or error}, ... ] }
+    """
     deckName = input_data.deckName or DEFAULT_DECK_NAME
     pairs = input_data.pairs
 
     if not pairs:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No pairs provided."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pairs provided."
         )
 
-    results = []
-    for pair in pairs:
-        front = pair.get("Front")
-        back = pair.get("Back")
-        if front and back:
-            response = await anki_service.add_card(deckName, front, back)
-            if not response["success"]:
-                results.append(
-                    {
-                        "Status": False,
-                        "Front": front,
-                        "Back": back,
-                        "Error": response.get("error", "Unknown error occurred."),
-                    }
-                )
-            else:
-                results.append({"Status": True, "Front": front, "Back": back})
+    results: List[CardModel] = []
 
-    return {"status": results}
+    for pair in pairs:
+        # We assume pair is already a CardModel from the AddCardsInput
+        front = pair.Front
+        back = pair.Back
+
+        # Attempt to add
+        response = await anki_service.add_card(deckName, front, back)
+        if not response["success"]:
+            # Save the error message in the Status
+            results.append(CardModel(Front=front, Back=back, Status=response.get("error", "Unknown error occurred.")))
+        else:
+            results.append(CardModel(Front=front, Back=back, Status="OK"))
+
+    return CardsResponse(cards=results)
 
 
 # Endpoint to get all decks

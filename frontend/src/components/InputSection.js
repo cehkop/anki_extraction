@@ -1,25 +1,16 @@
 // src/components/InputSection.js
 
 import React from 'react';
-import TextForm from './TextForm';
-import ImageUpload from './ImageUpload';
+import UnifiedInput from './UnifiedInput';
 
-function InputSection({ inputMode, handleLog, deckName, processingMode }) {
+function InputSection({ handleLog, deckName, processingMode }) {
   return (
     <div>
-      {inputMode === 'text' ? (
-        <TextForm
-          handleLog={handleLog}
-          deckName={deckName}
-          processingMode={processingMode}
-        />
-      ) : (
-        <ImageUpload
-          handleLog={handleLog}
-          deckName={deckName}
-          processingMode={processingMode}
-        />
-      )}
+      <UnifiedInput
+        handleLog={handleLog}
+        deckName={deckName}
+        processingMode={processingMode}
+      />
     </div>
   );
 }
