@@ -59,6 +59,19 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
     setSelectedFiles(files);
   };
 
+  const handleManualCardsClear = () => {
+    setSelectedFiles([]);
+    setExtractedPairs(null);
+    // fileInputRef.current.clear();
+  };
+  
+  const handleAllClear = () => {
+    setInputText('');
+    setSelectedFiles([]);
+    setExtractedPairs(null);
+    fileInputRef.current.clear();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -92,34 +105,22 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
 
         if (ankiErrorExists) {
           setAnkiError(true); // Show Dialog
+        } else {
+          // Clear input only if all cards have "OK" status
+          const allSuccess = res.data.cards.every((card) => card.Status === "OK");
+          if (allSuccess) {
+            handleAllClear()
+          }
         }
       }
 
       if (processingMode === 'manual' && res.data.cards) {
         setExtractedPairs(res.data.cards);
-      } else {
-        setInputText('');
-        setSelectedFiles([]);
-        fileInputRef.current.clear();
       }
     } catch (error) {
       console.error(error);
       handleLog('Error processing input.');
     }
-  };
-
-  const handleManualCardsClear = () => {
-    // setInputText('');
-    setSelectedFiles([]);
-    setExtractedPairs(null);
-    // fileInputRef.current.clear();
-  };
-  
-  const handleAllClear = () => {
-    setInputText('');
-    setSelectedFiles([]);
-    setExtractedPairs(null);
-    fileInputRef.current.clear();
   };
 
   const handleManualSubmit = async (selectedPairs) => {
@@ -138,14 +139,15 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
         );
 
         if (ankiErrorExists) {
-          setAnkiError(true); // Show Dialog
+          setAnkiError(true);
+        } else {
+          // Clear only if all submissions were successful
+          const allSuccess = res.data.cards.every((card) => card.Status === "OK");
+          if (allSuccess) {
+            handleAllClear()
+          }
         }
       }
-
-      setExtractedPairs(null);
-      setInputText('');
-      setSelectedFiles([]);
-      fileInputRef.current.clear();
     } catch (error) {
       console.error(error);
       handleLog('Error adding cards.');
@@ -175,7 +177,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
           <Button variant="contained" type="submit">
             Submit
           </Button>
-          <Button variant="outlined" color="error" onClick={handleAllClear}>
+          <Button variant="outlined" color="error">
             Clear
           </Button>
         </Box>
