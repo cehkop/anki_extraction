@@ -19,7 +19,7 @@ import axios from 'axios';
 
 function Config({ inputMode, setInputMode, deckName, setDeckName, processingMode, setProcessingMode }) {
   const [decks, setDecks] = useState([]);
-  const [selectedDeck, setSelectedDeck] = useState('test'); // Default deck name
+  const [selectedDeck, setSelectedDeck] = useState('Default'); // Default deck name
 
   // Handle input mode change
   const handleInputChange = (e) => {
@@ -63,22 +63,8 @@ function Config({ inputMode, setInputMode, deckName, setDeckName, processingMode
         Config
       </Typography>
 
-      {/* Input Mode Selection */}
-      <FormControl component="fieldset">
-        <FormLabel component="legend">Input Mode</FormLabel>
-        <RadioGroup
-          aria-label="input-mode"
-          value={inputMode}
-          onChange={handleInputChange}
-          name="input-mode"
-        >
-          <FormControlLabel value="text" control={<Radio />} label="Text" />
-          <FormControlLabel value="image" control={<Radio />} label="Image" />
-        </RadioGroup>
-      </FormControl>
-
       {/* Processing Mode Selection */}
-      <FormControl component="fieldset" sx={{ mt: 4 }}>
+      <FormControl component="fieldset" sx={{ mt: 2 }}>
         <FormLabel component="legend">Processing Mode</FormLabel>
         <RadioGroup
           aria-label="processing-mode"
