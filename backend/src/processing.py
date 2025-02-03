@@ -26,7 +26,7 @@ async def extract_pairs_from_text(text: str):
     # return [{"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
-    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
+            # {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
@@ -36,7 +36,43 @@ async def extract_pairs_from_text(text: str):
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."},
     #         {"Front": "knack for", "Back": "An aptitude for doing something."}]
-    prompt = get_extract_text_prompt()
+    prompt = (
+        "You are a perfect English teacher. Teacher are very helpful. Teacher helps me to learn English. "
+        "I use Anki cards to learn English and I need teacher help. My main language is Russian. "
+        "My current English level is about B1. Teacher goals is to help me to learn with anki. "
+        "I want teacher to help me to learn English like natives, without russian dialects. "
+        "For this goal teacher helps me to create anki cards with collocations, phrazes, sentences, etc - everything for effective learning. "
+        "Teacher gets as an input text and extracts any cards pairs of words and their translations to help me improve my English and speak like natives. "
+        "For each item, teacher provides a pair consisting of the original text and either a definition in English or a translation if it's complex. "
+        "Teacher should make cards understandeble for intermediate level. "
+        "Teacher must put collocations and words in the context to make it more learnable. "
+        "Teacher must put collocations in the exactly one context: one collocation - one card."
+        "Teacher, please, make context acording to my life: I'm about IT, machine learning team lead, hiking, running, cooking, peace, education."
+        "Teacher should only include items that are useful for language learning. Here are some examples:\n\n"
+        "Example:\n"
+        "Text: 'custom - sth that people in society or a community usually do: It's a custom for people to give presents to a couple getting married.'\n"
+        "Cards: [{'Front': 'custom - sth that people in society or a community usually do', 'Back': 'It is a custom for people to do something.'}]\n"
+        "Example:\n"
+        "Text: 'anaesthetic - a substance that makes you unable to feel pain'\n"
+        "Cards: [{'Front': 'anaesthetic - a substance that makes you unable to feel pain', 'Back': 'The operation is performed under anaesthetic.'}]\n\n"
+        "Example:\n"
+        "Text: 'different from sb'\n"
+        "Cards: [{'Front': 'different - not the same as somebody/something', 'Back': 'His 'Yes' was different from mine.'}]\n\n"
+        "Example:\n"
+        "Text: 'famous for'\n"
+        "Cards: [{'Front': 'famous for - known and recognized by many people because of a particular feature', 'Back': 'The actor became famous for his role as Superman.'}]\n\n"
+        "Example:\n"
+        "Text: 'to be worth sth'\n"
+        "Cards: [{'Front': 'to be worth sth - having a particular amount of money', 'Back': 'She must be worth at least half a million.'}]\n\n"
+        "Example:\n"
+        "Text: 'find a way'\n"
+        "Cards: [{'Front': 'find a way - to discover how to achieve or deal with something', 'Back': 'Finding a way through the legislation is impossible without expert advice.'}]\n\n"
+        "Example:\n"
+        "Text: 'be/get carried away'\n"
+        "Cards: [{'Front': 'be/get carried away - to be so excited about something that you cannot control what you say or do', 'Back': 'There’s far too much food – I’m afraid I got carried away!'}]\n\n"
+        "Keep in mind format cards as: {'Front': 'collocation - definition', 'Back': 'simple example'}"
+        "Now, extract cards from the following text:\n"
+        )
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -118,7 +154,43 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
         user_content = [
             {
                 "type": "text",
-                "text": get_extract_image_prompt(),
+                "text": (
+                    "You are a perfect English teacher. Teacher are very helpful. Teacher helps me to learn English. "
+                    "I use Anki cards to learn English and I need teacher help. My main language is Russian. "
+                    "My current English level is about B1-B2. Teacher goals is to help me to learn with anki. "
+                    "I want teacher to help me to learn English like natives, without russian dialects. "
+                    "For this goal teacher helps me to create anki cards with collocations, phrazes, sentences, etc - everything for effective learning. "
+                    "Teacher gets as an input image with text on it and extracts any cards pairs of words and their translations to help me improve my English and speak like natives. "
+                    "For each item, teacher provides a pair consisting of the original text and either a definition in English or a translation if it's complex. "
+                    "Teacher should make cards understandeble for intermediate level. "
+                    "Teacher must put collocations and words in the context to make it more learnable. "
+                    "Teacher must put collocations in the exactly one context: one collocation - one card."
+                    "Teacher, please, make context acording to my life: I'm about IT, machine learning team lead, hiking, running, cooking, peace, education."
+                    "Teacher should only include items that are useful for language learning. Here are some examples:\n\n"
+                    "Example:\n"
+                    "Text: 'custom - sth that people in society or a community usually do: It's a custom for people to give presents to a couple getting married.'\n"
+                    "Cards: [{'Front': 'custom - sth that people in society or a community usually do', 'Back': 'It is a custom for people to do something.'}]\n"
+                    "Example:\n"
+                    "Text: 'anaesthetic - a substance that makes you unable to feel pain'\n"
+                    "Cards: [{'Front': 'anaesthetic - a substance that makes you unable to feel pain', 'Back': 'The operation is performed under anaesthetic.'}]\n\n"
+                    "Example:\n"
+                    "Text: 'different from sb'\n"
+                    "Cards: [{'Front': 'different - not the same as somebody/something', 'Back': 'His 'Yes' was different from mine.'}]\n\n"
+                    "Example:\n"
+                    "Text: 'famous for'\n"
+                    "Cards: [{'Front': 'famous for - known and recognized by many people because of a particular feature', 'Back': 'The actor became famous for his role as Superman.'}]\n\n"
+                    "Example:\n"
+                    "Text: 'to be worth sth'\n"
+                    "Cards: [{'Front': 'to be worth sth - having a particular amount of money', 'Back': 'She must be worth at least half a million.'}]\n\n"
+                    "Example:\n"
+                    "Text: 'find a way'\n"
+                    "Cards: [{'Front': 'find a way - to discover how to achieve or deal with something', 'Back': 'Finding a way through the legislation is impossible without expert advice.'}]\n\n"
+                    "Example:\n"
+                    "Text: 'be/get carried away'\n"
+                    "Cards: [{'Front': 'be/get carried away - to be so excited about something that you cannot control what you say or do', 'Back': 'There’s far too much food – I’m afraid I got carried away!'}]\n\n"
+                    "Keep in mind format cards as: {'Front': 'collocation - definition', 'Back': 'simple example'}"
+                    "Now, extract cards from the following images:\n"
+                ),
             },
             {"type": "text", "text": "Image caption: " + image_caption},
             {

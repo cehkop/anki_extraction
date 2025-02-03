@@ -1,5 +1,3 @@
-// src/App.js
-
 import React, { useState } from 'react';
 import Config from './components/Config';
 import InputSection from './components/InputSection';
@@ -19,6 +17,7 @@ function App() {
   return (
     <Box sx={{ flexGrow: 1, height: '100vh' }}>
       <Grid container sx={{ height: '100%' }}>
+        {/* Sidebar */}
         <Grid item xs={2} sx={{ borderRight: '1px solid #444', height: '100%' }}>
           <Config
             inputMode={inputMode}
@@ -29,6 +28,8 @@ function App() {
             setProcessingMode={setProcessingMode}
           />
         </Grid>
+
+        {/* Main Content */}
         <Grid item xs={7} sx={{ borderRight: '1px solid #444', height: '100%' }}>
           <InputSection
             inputMode={inputMode}
@@ -37,6 +38,8 @@ function App() {
             processingMode={processingMode}
           />
         </Grid>
+
+        {/* Log Section */}
         <Grid item xs={3} sx={{ height: '100%' }}>
           <Log logs={logs} />
         </Grid>
