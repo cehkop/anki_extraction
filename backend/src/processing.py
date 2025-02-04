@@ -96,11 +96,11 @@ async def extract_pairs_from_text(text: str):
                                     "properties": {
                                         "Front": {
                                             "type": "string",
-                                            "description": "Original text.",
+                                            "description": "collocation - definition",
                                         },
                                         "Back": {
                                             "type": "string",
-                                            "description": "Definition or translation.",
+                                            "description": "simple example",
                                         },
                                     },
                                     "required": [
@@ -220,11 +220,11 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
                                     "properties": {
                                         "Front": {
                                             "type": "string",
-                                            "description": "Extracted text.",
+                                            "description": "collocation - definition",
                                         },
                                         "Back": {
                                             "type": "string",
-                                            "description": "Definition or translation.",
+                                            "description": "simple example",
                                         },
                                     },
                                     "required": ["Front", "Back"],
@@ -255,6 +255,11 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
 
 # Asynchronous function to process text with OpenAI API
 async def change_anki_pairs(pairs: Dict):
+    return [[{"Front": "knack for", "Back": "An aptitude for doing something."},{"Front": "knack for", "Back": "An aptitude for doing something."}],
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},
+            {"Front": "knack for", "Back": "An aptitude for doing something."},]
     prompt = get_change_pairs_prompt()
     try:
         response = await client.chat.completions.create(
@@ -279,11 +284,11 @@ async def change_anki_pairs(pairs: Dict):
                                     "properties": {
                                         "Front": {
                                             "type": "string",
-                                            "description": "Original text.",
+                                            "description": "collocation - definition",
                                         },
                                         "Back": {
                                             "type": "string",
-                                            "description": "Definition or translation.",
+                                            "description": "simple example",
                                         },
                                     },
                                     "required": [
