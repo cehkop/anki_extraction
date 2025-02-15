@@ -8,6 +8,8 @@ from fastapi import (
     Form,
     Request,
     status,
+    Body,
+    Query,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
@@ -203,13 +205,13 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
     """
     card_ids = await anki_service.get_cards_red(deck_name)
     if not card_ids:
-        return CardsResponse(cards=[])
+        return RedCardsResponse(cards=[])
 
     cards_info = await anki_service.cards_info(card_ids)
     # Convert to RedCardModel
     red_cards = []
     for card_info in cards_info:
-        note_id = card_info.get("note")
+        note_id = card_info.get("noteId")
         fields = card_info.get("fields", {})
         front_value = fields.get("Лицо", {}).get("value", "")
         back_value = fields.get("Оборот", {}).get("value", "")
@@ -218,8 +220,8 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
             Front=front_value,
             Back=back_value
         ))
-
-    return CardsResponse(cards=red_cards)
+    print(red_cards)
+    return RedCardsResponse(cards=red_cards)
 
 
 ### 2) UPDATE CARDS RED AUTO
@@ -269,24 +271,26 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
 
 
 ### 3) UPDATE CARDS RED MANUAL
-@app.post("/update_cards_red_manual")
-async def update_cards_red_manual(input_data: DeckRequest):
+@app.get("/update_cards_red_manual_get")
+async def update_cards_red_manual_get(deck_name: str = Query(...)):
     """
     Fetches the red cards, processes them with `change_anki_pairs`,
     but does NOT apply changes to Anki.
     Returns "before" and "after" for manual user selection.
     """
-    deck_name = input_data.deck_name
     card_ids = await anki_service.get_cards_red(deck_name)
     print(f"Fetching red cards from the deck: {deck_name}")
     print(f"card_ids: {card_ids}")
     cards_info = await anki_service.cards_info(card_ids)
     before_cards = []
     for cinfo in cards_info:
-        print(cinfo.__getitem__("cardId"), cinfo.__getitem__("fields"))
+        try:
+            print(cinfo.__getitem__("noteId"), cinfo.__getitem__("fields"))
+        except:
+            print(cinfo)
         if not cinfo:
             continue
-        note_id = cinfo["note"]
+        note_id = cinfo["noteId"]
         front_value = cinfo["fields"]["Лицо"]["value"]
         back_value = cinfo["fields"]["Оборот"]["value"]
         before_cards.append({
@@ -321,8 +325,137 @@ async def update_cards_red_manual(input_data: DeckRequest):
 
 
 @app.post("/update_cards_red_manual_adding")
-async def update_cards_red_manual_adding(input_data):
-    print(input_data)
+async def update_cards_red_manual_adding(
+    deckName: str = Body(...),
+    data: List[Dict[str, Any]] = Body(...)
+):
+    """
+    New logic:
+      - If all are 'no' => do nothing
+      - If exactly 1 'yes' => update old note
+      - If more than 1 'yes' => 
+          update old note with the first selected suggestion
+          add new notes for the rest of selected suggestions
+    """
+    results = []
+    print("Red cards manual update")
+    print(f"data = \n{data}\n",'-'*70,'\n\n')
+    for item in data:
+        note_id = item["noteId"]
+        old_front = item["oldFront"]
+        old_back = item["oldBack"]
+        suggestions = item.get("newSuggestions", [])
+
+        # Filter for suggestions with selected = True
+        selected_sugs = [s for s in suggestions if s.get("selected")]
+
+        # Case 1: No selected suggestions => do nothing
+        if not selected_sugs:
+            print("No selected suggestions - skipping update")
+            print(item)
+            print('-'*50)
+            results.append({
+                "noteId": note_id,
+                "action": "SKIP",
+                "reason": "No suggestions selected"
+            })
+            continue
+
+        # Case 2: Exactly 1 => update old note
+        if len(selected_sugs) == 1:
+            print("Only one is selected - updating the old note")
+            print(item)
+            print('-'*50)
+            chosen = selected_sugs[0]
+            new_front = chosen["Front"]
+            new_back = chosen["Back"]
+            update_resp = await anki_service.update_card(note_id, new_front, new_back)
+            if not update_resp["success"]:
+                status = update_resp["error"]
+            else:
+                status = "OK"
+                
+            cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
+            print('Change cards flag result\n'
+                f'{cards_flag_yellow}\n\n')
+            
+            results.append({
+                "noteId": note_id,
+                "beforeFront": old_front,
+                "beforeBack": old_back,
+                "afterFront": new_front,
+                "afterBack": new_back,
+                "action": "UPDATE",
+                "status": status,
+            })
+
+        # Case 3: 2 or more selected => 
+        #    update old note with the FIRST selected
+        #    then add new notes for the rest
+        else:
+            # 3a) Update the old note with the first suggestion
+            print("More than one is selected - updating the old note with the first selected suggestion")
+            print(item)
+            print('-'*50)
+            first = selected_sugs[0]
+            first_front = first["Front"]
+            first_back = first["Back"]
+            update_resp = await anki_service.update_card(note_id, first_front, first_back)
+            if not update_resp["success"]:
+                # If we can't update, skip the rest
+                results.append({
+                    "noteId": note_id,
+                    "beforeFront": old_front,
+                    "beforeBack": old_back,
+                    "attemptedFront": first_front,
+                    "attemptedBack": first_back,
+                    "action": "UPDATE_ERROR",
+                    "error": update_resp["error"]
+                })
+                continue
+            
+            # Set yellow flag
+            cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
+            print('Change cards flag result\n'
+                f'{cards_flag_yellow}\n\n')
+            results.append({
+                "noteId": note_id,
+                "beforeFront": old_front,
+                "beforeBack": old_back,
+                "afterFront": first_front,
+                "afterBack": first_back,
+                "action": "UPDATED_OLD",
+                "status": "OK"
+            })
+
+            # 3b) For each additional selected, add a brand-new note
+            for extra in selected_sugs[1:]:
+                ext_front = extra["Front"]
+                ext_back = extra["Back"]
+                add_resp = await anki_service.add_card(deckName, ext_front, ext_back)
+                # add_resp = {'error': 'test', 'success': False}
+                if not add_resp["success"]:
+                    results.append({
+                        "noteId": 0,
+                        "action": "ADD_ERROR",
+                        "front": ext_front,
+                        "back": ext_back,
+                        "error": add_resp["error"]
+                    })
+                else:
+                    results.append({
+                        "noteId": add_resp["noteId"],
+                        "action": "ADD_NEW",
+                        "front": ext_front,
+                        "back": ext_back,
+                        "status": "OK"
+                    })
+                cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
+                print('Change cards flag result\n'
+                    f'{cards_flag_yellow}\n\n')
+                
+    print(f"{'-'*50}\n{results}\n{'-'*50}\n\n")
+    return {"status": "DONE", "results": results}
 
 
 ### 4) FULL MANUAL ADD CARDS

@@ -85,12 +85,12 @@ class AnkiService:
             }
         }
         try:
-            # response = await self.client.post("/", json=payload, timeout=5.0)
-            # response.raise_for_status()
-            # response_json = response.json()
-            # if response_json.get("error"):
-            #     logger.error(f"Error updating card: {response_json['error']}")
-            #     return {"success": False, "error": response_json["error"]}
+            response = await self.client.post("/", json=payload, timeout=5.0)
+            response.raise_for_status()
+            response_json = response.json()
+            if response_json.get("error"):
+                logger.error(f"Error updating card: {response_json['error']}")
+                return {"success": False, "error": response_json["error"]}
             logger.info(f"Updated card noteId={note_id}: {front} - {back}")
             return {"success": True}
         except Exception as e:
@@ -116,6 +116,7 @@ class AnkiService:
             if response_json.get("error"):
                 logger.error(f"Error fetching red card IDs: {response_json['error']}")
                 return []
+            print(f"Got {len(response_json)} red cards")
             return response_json.get("result", [])
         except Exception as e:
             logger.error(f"get_cards_red error: {e}")
@@ -128,9 +129,9 @@ class AnkiService:
         if not await self.is_anki_running() or not card_ids:
             return []
         payload = {
-            "action": "cardsInfo",
+            "action": "notesInfo",
             "version": 6,
-            "params": {"cards": card_ids},
+            "params": {"notes": card_ids},
         }
         try:
             resp = await self.client.post("/", json=payload, timeout=5.0)
@@ -164,11 +165,11 @@ class AnkiService:
             }
         }
         try:
-            # resp = await self.client.post("/", json=payload, timeout=5.0)
-            # resp.raise_for_status()
-            # data = resp.json()
-            # if data.get("error"):
-            #     return {"success": False, "error": data["error"]}
+            resp = await self.client.post("/", json=payload, timeout=5.0)
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("error"):
+                return {"success": False, "error": data["error"]}
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -191,3 +192,103 @@ class AnkiService:
         except Exception as e:
             logger.error(f"get_decks error: {e}")
             return {"success": False, "error": str(e)}
+        
+    async def set_note_cards_flag_yellow(self, note_id: int) -> Dict[str, Any]:
+        """
+        From the note info, gather all card IDs for this note
+        and set their flags to 2 (yellow/orange).
+        
+        Returns a dict like:
+        {
+        "success": bool,
+        "details": [ 
+            { "cardId": 1234, "changed": True/False, "error": "..." }, 
+            ...
+        ]
+        }
+        """
+        if not await self.is_anki_running():
+            return {
+                "success": False,
+                "error": "Anki is not running. Please launch Anki and ensure AnkiConnect is enabled.",
+            }
+
+        # 1) Get the cards for this note using 'notesInfo'
+        payload_notes_info = {
+            "action": "notesInfo",
+            "version": 6,
+            "params": {
+                "notes": [note_id]
+            }
+        }
+        try:
+            resp = await self.client.post("/", json=payload_notes_info, timeout=5.0)
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("error"):
+                return {
+                    "success": False,
+                    "error": f"Failed to fetch note info: {data['error']}",
+                    "details": []
+                }
+            notes_result = data.get("result", [])
+            if not notes_result:
+                return {
+                    "success": False,
+                    "error": f"No note found with note_id={note_id}",
+                    "details": []
+                }
+            # notes_result[0] should be the note data
+            cards_list = notes_result[0].get("cards", [])
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error calling notesInfo: {e}",
+                "details": []
+            }
+
+        # 2) For each card, set flags=2 with 'setSpecificValueOfCard'
+        results = []
+        for card_id in cards_list:
+            payload_flag = {
+                "action": "setSpecificValueOfCard",
+                "version": 6,
+                "params": {
+                    "card": card_id,
+                    "keys": ["flags"],       # We only want to change "flags"
+                    "newValues": [2],      # 2 => "orange/yellow"
+                    "warning_check": True    # Required for changing these DB values
+                }
+            }
+            try:
+                resp_flag = await self.client.post("/", json=payload_flag, timeout=5.0)
+                resp_flag.raise_for_status()
+                data_flag = resp_flag.json()
+                if data_flag.get("error"):
+                    results.append({
+                        "cardId": card_id,
+                        "changed": False,
+                        "error": data_flag["error"]
+                    })
+                else:
+                    # data_flag["result"] is typically [true or false] for each item
+                    # but we can assume success = all true if no error
+                    results.append({
+                        "cardId": card_id,
+                        "changed": True,
+                        "error": None
+                    })
+            except Exception as e:
+                results.append({
+                    "cardId": card_id,
+                    "changed": False,
+                    "error": str(e)
+                })
+
+        # If any card changed successfully, success=True
+        any_changed = any(r["changed"] for r in results)
+        return {
+            "success": any_changed,
+            "details": results
+        }
+

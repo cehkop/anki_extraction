@@ -16,8 +16,10 @@ function RedCardsReview({ deckName, handleLog }) {
     try {
       // Suppose your endpoint is POST /update_cards_red_manual
       // and we pass { deck_name } in the body
-      const res = await axios.post('http://localhost:2341/update_cards_red_manual', {
-        deck_name: deckName,
+      const res = await axios.get('http://localhost:2341/update_cards_red_manual_get', {
+        params: {
+          deck_name: deckName
+        }
       });
       
       console.log('Fetched red cards for manual update:', res.data); // It's an array
@@ -57,7 +59,7 @@ function RedCardsReview({ deckName, handleLog }) {
 
   const handleClear = () => {
   };
-  
+
   const handleSubmit = async () => {
     // Gather user’s final choices
     const finalData = redCards.map((card) => ({
@@ -88,10 +90,6 @@ function RedCardsReview({ deckName, handleLog }) {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="h5" gutterBottom>
-        Manual Update Red Cards
-      </Typography>
-
       {/* Button to fetch red cards */}
       <Box sx={{ mb: 2 }}>
         <Button variant="contained" onClick={fetchRedCards}>
