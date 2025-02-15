@@ -19,7 +19,7 @@ from pathlib import Path
 import asyncio
 from typing import Dict, List, Any, Optional
 
-from src.utils import image_to_base64, read_and_validate_image, process_sound_tags
+from src.utils import image_to_base64, read_and_validate_image, process_sound_tags, apply_auto_changes_for_chunk, apply_manual_changes_for_chunk
 from src.processing import extract_pairs_from_text, extract_pairs_from_image, change_anki_pairs
 from src.anki import AnkiService
 
@@ -50,6 +50,9 @@ class CardModel(BaseModel):
     Back: str = Field(..., description="Back text of the card")
     Status: Optional[str] = Field(None, description="OK if added successfully, or error message")
 
+class DeckRequest(BaseModel):
+    deck_name: str
+
 # The request body for /add_cards
 class AddCardsInput(BaseModel):
     deckName: Optional[str] = Field(None, description="Anki deck name")
@@ -67,7 +70,7 @@ class RedCardModel(BaseModel):
     Front: str = Field(..., description="Existing front text")
     Back: str = Field(..., description="Existing back text")
 
-class CardsResponse(BaseModel):
+class RedCardsResponse(BaseModel):
     cards: List[RedCardModel] = Field(...)
 
 class BeforeAfterCard(BaseModel):
@@ -76,7 +79,7 @@ class BeforeAfterCard(BaseModel):
     beforeBack: str
     afterFront: str
     afterBack: str
-    Status: str = Field("OK", description="OK or error message")
+    Status: str
 
 class BeforeAfterResponse(BaseModel):
     cards: List[BeforeAfterCard]
@@ -222,14 +225,10 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
 ### 2) UPDATE CARDS RED AUTO
 @app.post("/update_cards_red_auto", response_model=BeforeAfterResponse)
 async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
-    """
-    Auto-process red cards:
-      - If exactly 1 new card => update the old note in place.
-      - If 2 or more => remove the old note + create new notes for all the new cards.
-    """
     card_ids = await anki_service.get_cards_red(deck_name)
+    # print(f"card_ids = {card_ids}")
     cards_info = await anki_service.cards_info(card_ids)
-    print(f"cards_info = {cards_info}")
+    # print(f"cards_info = {cards_info}")
 
     before_cards = []
     for cinfo in cards_info:
@@ -244,164 +243,86 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
 
     results = []
     batch_size = 5
-
-    # Process in chunks of `batch_size`
+    # 1) chunk the cards and call change_anki_pairs in chunks
     for i in range(0, len(before_cards), batch_size):
         chunk = before_cards[i : i + batch_size]
+
+        # call change_anki_pairs on this chunk
         new_cards_chunk = await change_anki_pairs(chunk)
+        print(f"Lenght of chunk {len(cards_info)} lenght of new_cards_chunk {len(new_cards_chunk)}")
+        if len(new_cards_chunk) != len(chunk):
+            print(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
+            continue
+        print(f"chunk = {chunk}")
         print(f"new_cards_chunk = {new_cards_chunk}")
 
-        for idx, old_card in enumerate(chunk):
-            if idx >= len(new_cards_chunk) or not isinstance(new_cards_chunk[idx], list):
-                # If no new data, skip
-                note_id = old_card["noteId"]
-                old_front = old_card["Front"]
-                old_back = old_card["Back"]
-                results.append(BeforeAfterCard(
-                    noteId=note_id,
-                    beforeFront=old_front,
-                    beforeBack=old_back,
-                    afterFront=old_front,
-                    afterBack=old_back,
-                    Status="NO_CHANGES"
-                ))
-                continue
-
-            new_cards = new_cards_chunk[idx]
-            note_id = old_card["noteId"]
-            old_front = old_card["Front"]
-            old_back = old_card["Back"]
-            print(f"old_card = {old_card}")
-            print(f"new_cards = {new_cards}")
-
-            if len(new_cards) == 0:
-                # No changes
-                results.append(BeforeAfterCard(
-                    noteId=note_id,
-                    beforeFront=old_front,
-                    beforeBack=old_back,
-                    afterFront=old_front,
-                    afterBack=old_back,
-                    Status="NO_CHANGES"
-                ))
-                continue
-
-            elif len(new_cards) == 1:
-                # Exactly 1 => update in place
-                first_new = new_cards[0]
-                new_front = first_new.get("Front", old_front)
-                new_back = first_new.get("Back", old_back)
-
-                update_resp = await anki_service.update_card(note_id, new_front, new_back)
-                if not update_resp["success"]:
-                    results.append(BeforeAfterCard(
-                        noteId=note_id,
-                        beforeFront=old_front,
-                        beforeBack=old_back,
-                        afterFront=new_front,
-                        afterBack=new_back,
-                        Status=update_resp["error"]
-                    ))
-                else:
-                    results.append(BeforeAfterCard(
-                        noteId=note_id,
-                        beforeFront=old_front,
-                        beforeBack=old_back,
-                        afterFront=new_front,
-                        afterBack=new_back,
-                        Status="OK"
-                    ))
-
-            else:
-                # 2 or more => remove old note & add new ones
-                del_resp = await anki_service.delete_note(note_id)
-                if not del_resp["success"]:
-                    # If can't delete, skip
-                    results.append(BeforeAfterCard(
-                        noteId=note_id,
-                        beforeFront=old_front,
-                        beforeBack=old_back,
-                        afterFront=old_front,
-                        afterBack=old_back,
-                        Status=f"DELETE_ERROR: {del_resp['error']}"
-                    ))
-                    continue
-
-                # We removed the old note, so let's record that result
-                results.append(BeforeAfterCard(
-                    noteId=note_id,
-                    beforeFront=old_front,
-                    beforeBack=old_back,
-                    afterFront="(deleted)",
-                    afterBack="(deleted)",
-                    Status="DELETED_OLD"
-                ))
-
-                # Then add brand-new notes for all new cards
-                for c in new_cards:
-                    ext_front = c.get("Front", "")
-                    ext_back = c.get("Back", "")
-                    add_resp = await anki_service.add_card(deck_name, ext_front, ext_back)
-                    status = "OK" if add_resp["success"] else add_resp.get("error", "Unknown error")
-
-                    # noteId of the newly added card:
-                    new_note_id = add_resp.get("noteId", 0)
-
-                    results.append(BeforeAfterCard(
-                        noteId=new_note_id,
-                        beforeFront="(new card)",
-                        beforeBack="(new card)",
-                        afterFront=ext_front,
-                        afterBack=ext_back,
-                        Status=status
-                    ))
-
+        # 2) apply the auto logic in a separate helper
+        batch_results = await apply_auto_changes_for_chunk(
+            chunk=chunk,
+            new_cards_chunk=new_cards_chunk,
+            deck_name=deck_name,
+            anki_service=anki_service
+        )
+        results.extend(batch_results)
+    print(results)
     return BeforeAfterResponse(cards=results)
 
 
 ### 3) UPDATE CARDS RED MANUAL
-@app.post("/update_cards_red_manual", response_model=BeforeAfterResponse)
-async def update_cards_red_manual(deck_name: str) -> BeforeAfterResponse:
+@app.post("/update_cards_red_manual")
+async def update_cards_red_manual(input_data: DeckRequest):
     """
-    Fetches the red cards, calls `change_anki_pairs`,
-    but returns "before" and "after" for manual user selection.
-    Does NOT apply changes in Anki.
+    Fetches the red cards, processes them with `change_anki_pairs`,
+    but does NOT apply changes to Anki.
+    Returns "before" and "after" for manual user selection.
     """
+    deck_name = input_data.deck_name
     card_ids = await anki_service.get_cards_red(deck_name)
-    info_list = await anki_service.cards_info(card_ids)
-
+    print(f"Fetching red cards from the deck: {deck_name}")
+    print(f"card_ids: {card_ids}")
+    cards_info = await anki_service.cards_info(card_ids)
     before_cards = []
-    for cinfo in info_list:
-        note_id = cinfo.get("note")
-        fields = cinfo.get("fields", {})
-        front_value = fields.get("Лицо", {}).get("value", "")
-        back_value = fields.get("Оборот", {}).get("value", "")
+    for cinfo in cards_info:
+        print(cinfo.__getitem__("cardId"), cinfo.__getitem__("fields"))
+        if not cinfo:
+            continue
+        note_id = cinfo["note"]
+        front_value = cinfo["fields"]["Лицо"]["value"]
+        back_value = cinfo["fields"]["Оборот"]["value"]
         before_cards.append({
             "noteId": note_id,
             "Front": front_value,
             "Back": back_value
         })
 
-    new_cards = await change_anki_pairs(before_cards)
-
     results = []
-    for old_card, new_card in zip(before_cards, new_cards):
-        note_id = old_card["noteId"]
-        old_front = old_card["Front"]
-        old_back = old_card["Back"]
-        new_front = new_card.get("Front", old_front)
-        new_back = new_card.get("Back", old_back)
-        # We do not call update_card here (manual flow)
-        results.append(BeforeAfterCard(
-            noteId=note_id,
-            beforeFront=old_front,
-            beforeBack=old_back,
-            afterFront=new_front,
-            afterBack=new_back,
-            Status="NOT_APPLIED"
-        ))
+    batch_size = 5
+    # 1) chunk the cards and call change_anki_pairs in chunks
+    for i in range(0, len(before_cards), batch_size):
+        chunk = before_cards[i : i + batch_size]
 
-    return BeforeAfterResponse(cards=results)
+        # call change_anki_pairs on this chunk
+        new_cards_chunk = await change_anki_pairs(chunk)
+        print(f"Length of chunk {len(chunk)}, length of new_cards_chunk {len(new_cards_chunk)}")
+        if len(new_cards_chunk) != len(chunk):
+            print(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
+            continue
+        print(f"chunk = {chunk}")
+        print(f"new_cards_chunk = {new_cards_chunk}")
+
+        # 2) apply manual logic
+        batch_results = apply_manual_changes_for_chunk(
+            chunk=chunk,
+            new_cards_chunk=new_cards_chunk
+        )
+        results.extend(batch_results)
+    
+    return results
+
+
+@app.post("/update_cards_red_manual_adding")
+async def update_cards_red_manual_adding(input_data):
+    print(input_data)
 
 
 ### 4) FULL MANUAL ADD CARDS

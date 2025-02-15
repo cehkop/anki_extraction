@@ -74,6 +74,7 @@ function Config({ inputMode, setInputMode, deckName, setDeckName, processingMode
         >
           <FormControlLabel value="auto" control={<Radio />} label="Automatic" />
           <FormControlLabel value="manual" control={<Radio />} label="Manual" />
+          <FormControlLabel value="red_cards" control={<Radio />} label="Red cards" />
         </RadioGroup>
       </FormControl>
 

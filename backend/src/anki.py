@@ -102,9 +102,10 @@ class AnkiService:
         Returns card IDs that have a red flag in the given deck.
         """
         if not await self.is_anki_running():
+            print("Anki is not running")
             return []
         payload = {
-            "action": "findCards",
+            "action": "findNotes",
             "version": 6,
             "params": {"query": f"deck:{deck_name} flag:1"},
         }
