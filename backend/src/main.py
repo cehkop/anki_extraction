@@ -21,7 +21,14 @@ from pathlib import Path
 import asyncio
 from typing import Dict, List, Any, Optional
 
-from src.utils import image_to_base64, read_and_validate_image, process_sound_tags, apply_auto_changes_for_chunk, apply_manual_changes_for_chunk
+from src.utils import (
+    image_to_base64, 
+    read_and_validate_image, 
+    process_sound_tags, 
+    apply_auto_changes_for_chunk, 
+    apply_manual_changes_for_chunk,
+    remove_sound_tags,
+    )
 from src.processing import extract_pairs_from_text, extract_pairs_from_image, change_anki_pairs
 from src.anki import AnkiService
 
@@ -272,13 +279,17 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
 
 ### 3) UPDATE CARDS RED MANUAL
 @app.get("/update_cards_red_manual_get")
-async def update_cards_red_manual_get(deck_name: str = Query(...)):
+async def update_cards_red_manual_get(
+    deck_name: str = Query(...),
+    cards_num: int = Query(3),
+):
     """
-    Fetches the red cards, processes them with `change_anki_pairs`,
-    but does NOT apply changes to Anki.
-    Returns "before" and "after" for manual user selection.
+    Fetches up to `cards_num` red cards from the specified deck.
+    This is a GET endpoint; parameters come in as query params:
+      e.g. /update_cards_red_manual_get?deck_name=test&cards_num=10
     """
     card_ids = await anki_service.get_cards_red(deck_name)
+    card_ids = card_ids[:cards_num]
     print(f"Fetching red cards from the deck: {deck_name}")
     print(f"card_ids: {card_ids}")
     cards_info = await anki_service.cards_info(card_ids)
@@ -286,13 +297,16 @@ async def update_cards_red_manual_get(deck_name: str = Query(...)):
     for cinfo in cards_info:
         try:
             print(cinfo.__getitem__("noteId"), cinfo.__getitem__("fields"))
-        except:
-            print(cinfo)
+        except Exception as e:
+            print(cinfo, e)
         if not cinfo:
             continue
+        
         note_id = cinfo["noteId"]
         front_value = cinfo["fields"]["Лицо"]["value"]
+        front_value, _ = remove_sound_tags(front_value)
         back_value = cinfo["fields"]["Оборот"]["value"]
+        back_value, _ = remove_sound_tags(back_value)
         before_cards.append({
             "noteId": note_id,
             "Front": front_value,
@@ -300,7 +314,7 @@ async def update_cards_red_manual_get(deck_name: str = Query(...)):
         })
 
     results = []
-    batch_size = 5
+    batch_size = 3
     # 1) chunk the cards and call change_anki_pairs in chunks
     for i in range(0, len(before_cards), batch_size):
         chunk = before_cards[i : i + batch_size]

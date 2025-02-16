@@ -18,7 +18,8 @@ function RedCardsReview({ deckName, handleLog }) {
       // and we pass { deck_name } in the body
       const res = await axios.get('http://localhost:2341/update_cards_red_manual_get', {
         params: {
-          deck_name: deckName
+          deck_name: deckName,
+          cards_num: 3,
         }
       });
       
