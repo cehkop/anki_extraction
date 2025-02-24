@@ -6,25 +6,23 @@ from fastapi import (
     File,
     UploadFile,
     Form,
-    Request,
     status,
     Body,
     Query,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 import os
 import dotenv
 import logging
 from io import BytesIO
-from pathlib import Path
+import sys
 import asyncio
 from typing import Dict, List, Any, Optional
 
 from src.utils import (
     image_to_base64, 
     read_and_validate_image, 
-    process_sound_tags, 
     apply_auto_changes_for_chunk, 
     apply_manual_changes_for_chunk,
     remove_sound_tags,
@@ -33,6 +31,10 @@ from src.processing import extract_pairs_from_text, extract_pairs_from_image, ch
 from src.anki import AnkiService
 
 dotenv.load_dotenv()
+
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+handler.setFormatter(formatter)
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +45,7 @@ logging.basicConfig(
     filemode="a",
 )
 logger = logging.getLogger(__name__)
+logger.addHandler(handler)
 
 app = FastAPI()
 
@@ -152,7 +155,8 @@ async def handle_process(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No cards extracted from text or images."
         )
-
+    
+    logger.info(f"All extracted cards: {all_cards}")
     # 3) If 'manual', just return them with Status=None
     if mode == "manual":
         return CardsResponse(cards=all_cards)
@@ -227,7 +231,7 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
             Front=front_value,
             Back=back_value
         ))
-    print(red_cards)
+    logger.info(red_cards)
     return RedCardsResponse(cards=red_cards)
 
 
@@ -235,9 +239,9 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
 @app.post("/update_cards_red_auto", response_model=BeforeAfterResponse)
 async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
     card_ids = await anki_service.get_cards_red(deck_name)
-    # print(f"card_ids = {card_ids}")
+    # logger.info(f"card_ids = {card_ids}")
     cards_info = await anki_service.cards_info(card_ids)
-    # print(f"cards_info = {cards_info}")
+    # logger.info(f"cards_info = {cards_info}")
 
     before_cards = []
     for cinfo in cards_info:
@@ -258,12 +262,12 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
 
         # call change_anki_pairs on this chunk
         new_cards_chunk = await change_anki_pairs(chunk)
-        print(f"Lenght of chunk {len(cards_info)} lenght of new_cards_chunk {len(new_cards_chunk)}")
+        logger.info(f"Lenght of chunk {len(cards_info)} lenght of new_cards_chunk {len(new_cards_chunk)}")
         if len(new_cards_chunk) != len(chunk):
-            print(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
+            logger.info(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
             continue
-        print(f"chunk = {chunk}")
-        print(f"new_cards_chunk = {new_cards_chunk}")
+        logger.info(f"chunk = {chunk}")
+        logger.info(f"new_cards_chunk = {new_cards_chunk}")
 
         # 2) apply the auto logic in a separate helper
         batch_results = await apply_auto_changes_for_chunk(
@@ -273,7 +277,7 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
             anki_service=anki_service
         )
         results.extend(batch_results)
-    print(results)
+    logger.info(results)
     return BeforeAfterResponse(cards=results)
 
 
@@ -290,15 +294,15 @@ async def update_cards_red_manual_get(
     """
     card_ids = await anki_service.get_cards_red(deck_name)
     card_ids = card_ids[:cards_num]
-    print(f"Fetching red cards from the deck: {deck_name}")
-    print(f"card_ids: {card_ids}")
+    logger.info(f"Fetching red cards from the deck: {deck_name}")
+    logger.info(f"card_ids: {card_ids}")
     cards_info = await anki_service.cards_info(card_ids)
     before_cards = []
     for cinfo in cards_info:
         try:
-            print(cinfo.__getitem__("noteId"), cinfo.__getitem__("fields"))
+            logger.info(cinfo.__getitem__("noteId"), cinfo.__getitem__("fields"))
         except Exception as e:
-            print(cinfo, e)
+            logger.error(cinfo, e)
         if not cinfo:
             continue
         
@@ -321,12 +325,12 @@ async def update_cards_red_manual_get(
 
         # call change_anki_pairs on this chunk
         new_cards_chunk = await change_anki_pairs(chunk)
-        print(f"Length of chunk {len(chunk)}, length of new_cards_chunk {len(new_cards_chunk)}")
+        logger.info(f"Length of chunk {len(chunk)}, length of new_cards_chunk {len(new_cards_chunk)}")
         if len(new_cards_chunk) != len(chunk):
-            print(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
+            logger.info(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
             continue
-        print(f"chunk = {chunk}")
-        print(f"new_cards_chunk = {new_cards_chunk}")
+        logger.info(f"chunk = {chunk}")
+        logger.info(f"new_cards_chunk = {new_cards_chunk}")
 
         # 2) apply manual logic
         batch_results = apply_manual_changes_for_chunk(
@@ -352,8 +356,8 @@ async def update_cards_red_manual_adding(
           add new notes for the rest of selected suggestions
     """
     results = []
-    print("Red cards manual update")
-    print(f"data = \n{data}\n",'-'*70,'\n\n')
+    logger.info("Red cards manual update")
+    logger.info(f"data = \n{data}\n",'--------------','\n\n')
     for item in data:
         note_id = item["noteId"]
         old_front = item["oldFront"]
@@ -365,9 +369,9 @@ async def update_cards_red_manual_adding(
 
         # Case 1: No selected suggestions => do nothing
         if not selected_sugs:
-            print("No selected suggestions - skipping update")
-            print(item)
-            print('-'*50)
+            logger.info("No selected suggestions - skipping update")
+            logger.info(item)
+            logger.info('---------------------------------------------------')
             results.append({
                 "noteId": note_id,
                 "action": "SKIP",
@@ -377,9 +381,9 @@ async def update_cards_red_manual_adding(
 
         # Case 2: Exactly 1 => update old note
         if len(selected_sugs) == 1:
-            print("Only one is selected - updating the old note")
-            print(item)
-            print('-'*50)
+            logger.info("Only one is selected - updating the old note")
+            logger.info(item)
+            logger.info('---------------------------------------------------')
             chosen = selected_sugs[0]
             new_front = chosen["Front"]
             new_back = chosen["Back"]
@@ -390,7 +394,7 @@ async def update_cards_red_manual_adding(
                 status = "OK"
                 
             cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
-            print('Change cards flag result\n'
+            logger.info('Change cards flag result\n'
                 f'{cards_flag_yellow}\n\n')
             
             results.append({
@@ -408,9 +412,9 @@ async def update_cards_red_manual_adding(
         #    then add new notes for the rest
         else:
             # 3a) Update the old note with the first suggestion
-            print("More than one is selected - updating the old note with the first selected suggestion")
-            print(item)
-            print('-'*50)
+            logger.info("More than one is selected - updating the old note with the first selected suggestion")
+            logger.info(item)
+            logger.info('---------------------------------------------------')
             first = selected_sugs[0]
             first_front = first["Front"]
             first_back = first["Back"]
@@ -430,7 +434,7 @@ async def update_cards_red_manual_adding(
             
             # Set yellow flag
             cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
-            print('Change cards flag result\n'
+            logger.info('Change cards flag result\n'
                 f'{cards_flag_yellow}\n\n')
             results.append({
                 "noteId": note_id,
@@ -465,10 +469,10 @@ async def update_cards_red_manual_adding(
                         "status": "OK"
                     })
                 cards_flag_yellow = await anki_service.set_note_cards_flag_yellow(note_id)
-                print('Change cards flag result\n'
+                logger.info('Change cards flag result\n'
                     f'{cards_flag_yellow}\n\n')
                 
-    print(f"{'-'*50}\n{results}\n{'-'*50}\n\n")
+    logger.info(f"{'------------'}\n{results}\n{'-----------'}\n\n")
     return {"status": "DONE", "results": results}
 
 
