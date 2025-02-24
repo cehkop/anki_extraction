@@ -13,17 +13,22 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
   const [ankiError, setAnkiError] = useState(false); // State to control Dialog visibility
   const fileInputRef = useRef();
 
+  // ----------------------------
+  // 1) Handle paste text + images
+  // ----------------------------
   useEffect(() => {
     const handlePaste = (event) => {
       const clipboardItems = event.clipboardData.items;
       let foundImage = false;
       let foundText = false;
 
+      // Possibly text
       const pastedText = event.clipboardData.getData('text/plain');
       if (pastedText) {
         foundText = true;
       }
 
+      // Possibly images
       let imageFiles = [];
       for (let i = 0; i < clipboardItems.length; i++) {
         const item = clipboardItems[i];
@@ -45,7 +50,13 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
       }
 
       if (imageFiles.length > 0) {
-        setSelectedFiles((prevFiles) => [...prevFiles, ...imageFiles]);
+        // Deduplicate by name+size
+        setSelectedFiles((prevFiles) => {
+          const newFiles = imageFiles.filter(
+            (img) => !prevFiles.some((p) => p.name === img.name && p.size === img.size)
+          );
+          return [...prevFiles, ...newFiles];
+        });
       }
     };
 
@@ -55,23 +66,40 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
     };
   }, []);
 
+  // ----------------------------------
+  // 2) If user picks images in file input
+  // ----------------------------------
   const handleFileChange = (files) => {
-    setSelectedFiles(files);
+    // Deduplicate by name + size
+    setSelectedFiles((prevFiles) => {
+      const newFiles = files.filter(
+        (file) => !prevFiles.some((p) => p.name === file.name && p.size === file.size)
+      );
+      return [...prevFiles, ...newFiles];
+    });
   };
 
+  // ----------------------------------
+  // 3) Clear logic
+  // ----------------------------------
   const handleManualCardsClear = () => {
-    setSelectedFiles([]);
+    // For "manual" flow: we want to keep text, but reset extracted pairs & files
     setExtractedPairs(null);
-    // fileInputRef.current.clear();
   };
-  
+
   const handleAllClear = () => {
+    // Wipe everything: text, pairs, files
     setInputText('');
     setSelectedFiles([]);
     setExtractedPairs(null);
-    fileInputRef.current.clear();
+    if (fileInputRef.current) {
+      fileInputRef.current.clear();
+    }
   };
 
+  // ----------------------------------
+  // 4) Submission logic
+  // ----------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -97,6 +125,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
       handleLog(`Response: ${JSON.stringify(res.data, null, 2)}`);
 
       if (res.data.cards) {
+        // Check if there's an ankiError
         const ankiErrorExists = res.data.cards.some(
           (card) =>
             card.Status ===
@@ -104,16 +133,17 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
         );
 
         if (ankiErrorExists) {
-          setAnkiError(true); // Show Dialog
+          setAnkiError(true);
         } else {
-          // Clear input only if all cards have "OK" status
+          // If all cards are "OK", then do a full clear
           const allSuccess = res.data.cards.every((card) => card.Status === "OK");
           if (allSuccess) {
-            handleAllClear()
+            handleAllClear();
           }
         }
       }
 
+      // If manual and there's "cards", show them
       if (processingMode === 'manual' && res.data.cards) {
         setExtractedPairs(res.data.cards);
       }
@@ -123,6 +153,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
     }
   };
 
+  // Submit selected pairs from ManualCardReview
   const handleManualSubmit = async (selectedPairs) => {
     try {
       const res = await axios.post('http://localhost:2341/add_cards', {
@@ -141,10 +172,10 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
         if (ankiErrorExists) {
           setAnkiError(true);
         } else {
-          // Clear only if all submissions were successful
+          // If all new cards are "OK", clear everything
           const allSuccess = res.data.cards.every((card) => card.Status === "OK");
           if (allSuccess) {
-            handleAllClear()
+            handleAllClear();
           }
         }
       }
@@ -177,7 +208,7 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
           <Button variant="contained" type="submit">
             Submit
           </Button>
-          <Button variant="outlined" color="error">
+          <Button variant="outlined" color="error" onClick={handleAllClear}>
             Clear
           </Button>
         </Box>
