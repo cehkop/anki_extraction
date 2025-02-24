@@ -34,7 +34,7 @@ def get_extract_text_prompt():
         "Text: 'be/get carried away'\n"
         "Cards: [{'Front': 'be/get carried away - to be so excited about something that you cannot control what you say or do', 'Back': 'There’s far too much food – I’m afraid I got carried away!'}]\n\n"
         "Keep in mind format cards as: {'Front': 'collocation - definition', 'Back': 'simple example'}"
-        "Remember to keep the definition and the example sentence simple. "
+        "Remember to keep the definition and the example sentence simple, short and easy to learn. "
         "Now, extract cards from the following text:\n"
         )
     
@@ -75,7 +75,7 @@ def get_extract_image_prompt():
         "Text: 'be/get carried away'\n"
         "Cards: [{'Front': 'be/get carried away - to be so excited about something that you cannot control what you say or do', 'Back': 'There’s far too much food – I’m afraid I got carried away!'}]\n\n"
         "Keep in mind format cards as: {'Front': 'collocation - definition', 'Back': 'simple example'}"
-        "Remember to keep the definition and the example sentence simple. "
+        "Remember to keep the definition and the example sentence simple, short and easy to learn. "
         "Now, extract cards from the following images:\n"
         )
     
@@ -93,8 +93,8 @@ def get_change_pairs_prompt():
         "Teacher should make cards understandeble for intermediate level. "
         "Teacher must put collocations and words in the context to make it more learnable. "
         "Teacher must put collocations in the exactly one context: one collocation - one card. "
-        "Teacher, please, make context acording to my life: I'm about IT, machine learning team lead, hiking, running, cooking, peace, education. "
-        "Teacher should try to write definition and context the cambridge dictionary way. "
+        "Teacher, please, make context according to my life: I'm about IT, machine learning team lead, hiking, running, cooking, peace, quiet, education. "
+        "Teacher should try to write definition and context the cambridge dictionary way. Teacher should write definition and context in easy way - do not make it complex."
         "Teacher should only include items that are useful for language learning. Here are some examples:\n\n"
         "Example:\n"
         "Cards input: [{'Front': 'a knack', 'Back': 'сноровка'}]\n"
@@ -117,6 +117,6 @@ def get_change_pairs_prompt():
         "Cards input: [{'Front': 'жду с нетерпением', 'Back': 'look forward to'}, {'Front': 'The room has been cleaned.', 'Back': 'The room has been tidied up.'}]\n"
         "Cards: [[{'Front': 'look forward to - to feel excited about something that will happen in the future,', 'Back': 'I look forward to hearing from you.'}],"
         "[{'Front': 'tidy up - an act of making a place tidy, clean', 'Back': 'Let's have a quick tidy-up before Mum gets home.'}]]\n"
-        "Remember to keep the definition and the example sentence simple. "
+        "Remember to keep the definition and the example sentence simple, short (3-10 words) and easy to learn. "
         "Now, improve the following cards:\n"
         )
