@@ -1,20 +1,20 @@
-version: '3.8'
-
 services:
   backend:
     restart: always
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: backend
+    # container_name: backend   # (можно оставить/убрать)
     tty: true
     ports:
-      - "2341:2341"
-    network_mode: "host"  # Use host network mode on Linux
+      - "2341:2341"  # публикуем порт наружу
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_PROXY=${OPENAI_PROXY}
-      - ANKI_CONNECT_URL=http://localhost:8765  # Now 'localhost' refers to the host
+      # на macOS из контейнера на хост ходим так:
+      - ANKI_CONNECT_URL=http://host.docker.internal:8765
+    networks:
+      - app-network
 
   frontend:
     restart: always
@@ -22,13 +22,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: frontend
+    # container_name: frontend
     ports:
-      - "2342:2342"
+      - "2342:80"  # Nginx обычно слушает 80 внутри
     depends_on:
       - backend
     networks:
-      - app-network  # frontend can use the Docker bridge network
+      - app-network
 
 networks:
   app-network:

@@ -78,7 +78,7 @@ function RedCardsReview({ deckName, handleLog }) {
 
     try {
       // POST to "update_cards_red_manual_adding" or whichever route you have
-      const resp = await axios.post('http://localhost:2341/update_cards_red_manual_adding', {
+      const resp = await axios.post('/api/update_cards_red_manual_adding', {
         deckName,
         data: finalData
       });

@@ -328,6 +328,8 @@ async def update_cards_red_manual_get(
         logger.info(f"Length of chunk {len(chunk)}, length of new_cards_chunk {len(new_cards_chunk)}")
         if len(new_cards_chunk) != len(chunk):
             logger.info(f"Warning: Expected {len(chunk)} new cards, but got {len(new_cards_chunk)}")
+            logger.info(chunk)
+            logger.info(new_cards_chunk)
             continue
         logger.info(f"chunk = {chunk}")
         logger.info(f"new_cards_chunk = {new_cards_chunk}")
@@ -531,7 +533,10 @@ async def get_decks():
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:2342"],  # Use the exact frontend origin
+    allow_origins=[
+        "http://localhost:2342",
+        "http://127.0.0.1:2342",
+    ],  # Use the exact frontend origin
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],  # Explicitly allow OPTIONS
     allow_headers=["Content-Type", "Authorization"],  # Adjust as needed

@@ -118,9 +118,9 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
     });
 
     try {
-      const res = await axios.post('http://localhost:2341/process', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await axios.post('/api/process', formData, {
+         headers: { 'Content-Type': 'multipart/form-data' },
+       });
       console.log("Response from backend:", res.data);
       handleLog(`Response: ${JSON.stringify(res.data, null, 2)}`);
 
@@ -156,10 +156,10 @@ function UnifiedInput({ handleLog, deckName, processingMode }) {
   // Submit selected pairs from ManualCardReview
   const handleManualSubmit = async (selectedPairs) => {
     try {
-      const res = await axios.post('http://localhost:2341/add_cards', {
-        deckName,
-        pairs: selectedPairs,
-      });
+      const res = await axios.post('/api/add_cards', {
+         deckName,
+         pairs: selectedPairs,
+       });
       handleLog(`Added Cards: ${JSON.stringify(res.data, null, 2)}`);
 
       if (res.data.cards) {
