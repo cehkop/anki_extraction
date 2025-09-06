@@ -224,8 +224,8 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
     for card_info in cards_info:
         note_id = card_info.get("noteId")
         fields = card_info.get("fields", {})
-        front_value = fields.get("Лицо", {}).get("value", "")
-        back_value = fields.get("Оборот", {}).get("value", "")
+        front_value = fields.get("Front", {}).get("value", "")
+        back_value = fields.get("Back", {}).get("value", "")
         red_cards.append(RedCardModel(
             noteId=note_id,
             Front=front_value,
@@ -246,8 +246,8 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
     before_cards = []
     for cinfo in cards_info:
         note_id = cinfo["note"]
-        front_value = cinfo["fields"]["Лицо"]["value"]
-        back_value = cinfo["fields"]["Оборот"]["value"]
+        front_value = cinfo["fields"]["Front"]["value"]
+        back_value = cinfo["fields"]["Back"]["value"]
         before_cards.append({
             "noteId": note_id,
             "Front": front_value,
@@ -307,9 +307,9 @@ async def update_cards_red_manual_get(
             continue
         
         note_id = cinfo["noteId"]
-        front_value = cinfo["fields"]["Лицо"]["value"]
+        front_value = cinfo["fields"]["Front"]["value"]
         front_value, _ = remove_sound_tags(front_value)
-        back_value = cinfo["fields"]["Оборот"]["value"]
+        back_value = cinfo["fields"]["Back"]["value"]
         back_value, _ = remove_sound_tags(back_value)
         before_cards.append({
             "noteId": note_id,

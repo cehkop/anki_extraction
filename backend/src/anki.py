@@ -34,8 +34,8 @@ class AnkiService:
             "params": {
                 "note": {
                     "deckName": deck_name,
-                    "modelName": "Основная (с обратной карточкой)",
-                    "fields": {"Лицо": front, "Оборот": back},
+                    "modelName": "Basic",
+                    "fields": {"Front": front, "Back": back},
                     "options": {
                         "allowDuplicate": False,
                         "duplicateScopeOptions": {
@@ -48,6 +48,7 @@ class AnkiService:
                 }
             },
         }
+        logger.info(payload)
         try:
             response = await self.client.post("/", json=payload, timeout=5.0)
             response.raise_for_status()
@@ -78,8 +79,8 @@ class AnkiService:
                 "note": {
                     "id": note_id,
                     "fields": {
-                        "Лицо": front,
-                        "Оборот": back
+                        "Front": front,
+                        "Back": back
                     }
                 }
             }
@@ -291,4 +292,3 @@ class AnkiService:
             "success": any_changed,
             "details": results
         }
-
