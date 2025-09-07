@@ -49,7 +49,7 @@ async def extract_pairs_from_text(text: str):
                 "json_schema": {
                     "name": "extract_cards",
                     "strict": True,
-                    "description": "Extract useful collocations and their definitions or translations.",
+                    "description": "Extract useful collocations and output Cloze-style cards.",
                     "schema": {
                         "type": "object",
                         "properties": {
@@ -60,11 +60,11 @@ async def extract_pairs_from_text(text: str):
                                     "properties": {
                                         "Front": {
                                             "type": "string",
-                                            "description": "collocation - definition",
+                                            "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]",
                                         },
                                         "Back": {
                                             "type": "string",
-                                            "description": "simple example",
+                                            "description": "1–3 short synonyms/near-phrases, comma-separated",
                                         },
                                     },
                                     "required": [
@@ -148,11 +148,11 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
                                     "properties": {
                                         "Front": {
                                             "type": "string",
-                                            "description": "collocation - definition",
+                                            "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]",
                                         },
                                         "Back": {
                                             "type": "string",
-                                            "description": "simple example",
+                                            "description": "1–3 short synonyms/near-phrases, comma-separated",
                                         },
                                     },
                                     "required": ["Front", "Back"],
@@ -220,9 +220,9 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
                             "type": "object",
                             "properties": {
                                 "Front": {"type": "string",
-                                          "description": "collocation - definition"},
+                                          "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]"},
                                 "Back":  {"type": "string",
-                                          "description": "simple example"}
+                                          "description": "1–3 short synonyms/near-phrases, comma-separated"}
                             },
                             "required": ["Front", "Back"],
                             "additionalProperties": False

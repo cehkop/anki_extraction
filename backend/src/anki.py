@@ -22,7 +22,7 @@ class AnkiService:
             return False
 
     async def add_card(self, deck_name: str, front: str, back: str) -> Dict[str, Any]:
-        """Adds a new note in Anki."""
+        """Adds a new note in Anki using Cloze model with fields 'Front' and 'Back'."""
         if not await self.is_anki_running():
             return {
                 "success": False,
@@ -34,7 +34,7 @@ class AnkiService:
             "params": {
                 "note": {
                     "deckName": deck_name,
-                    "modelName": "Basic",
+                    "modelName": "Cloze",
                     "fields": {"Front": front, "Back": back},
                     "options": {
                         "allowDuplicate": False,
@@ -64,24 +64,24 @@ class AnkiService:
 
     async def update_card(self, note_id: int, front: str, back: str) -> Dict[str, Any]:
         """
-        Updates an existing note's fields. 
-        This rewrites the old card content in place.
+        Updates an existing note's fields 'Front' and 'Back'.
+        Works for Cloze (customized with Front/Back) and Basic models.
         """
         if not await self.is_anki_running():
             return {
                 "success": False,
                 "error": "Anki is not running. Please launch Anki and ensure AnkiConnect is enabled.",
             }
+
+        update_fields = {"Front": front, "Back": back}
+
         payload = {
             "action": "updateNoteFields",
             "version": 6,
             "params": {
                 "note": {
                     "id": note_id,
-                    "fields": {
-                        "Front": front,
-                        "Back": back
-                    }
+                    "fields": update_fields,
                 }
             }
         }
