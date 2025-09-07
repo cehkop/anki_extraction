@@ -28,6 +28,9 @@ class AnkiService:
                 "success": False,
                 "error": "Anki is not running. Please launch Anki and ensure AnkiConnect is enabled.",
             }
+        # Ensure line breaks render in Anki by converting to <br>
+        front_html = front.replace("\n", "<br>") if isinstance(front, str) else front
+        back_html = back.replace("\n", "<br>") if isinstance(back, str) else back
         payload = {
             "action": "addNote",
             "version": 6,
@@ -35,7 +38,7 @@ class AnkiService:
                 "note": {
                     "deckName": deck_name,
                     "modelName": "Cloze",
-                    "fields": {"Front": front, "Back": back},
+                    "fields": {"Front": front_html, "Back": back_html},
                     "options": {
                         "allowDuplicate": False,
                         "duplicateScopeOptions": {
@@ -73,7 +76,10 @@ class AnkiService:
                 "error": "Anki is not running. Please launch Anki and ensure AnkiConnect is enabled.",
             }
 
-        update_fields = {"Front": front, "Back": back}
+        # Ensure line breaks render in Anki by converting to <br>
+        front_html = front.replace("\n", "<br>") if isinstance(front, str) else front
+        back_html = back.replace("\n", "<br>") if isinstance(back, str) else back
+        update_fields = {"Front": front_html, "Back": back_html}
 
         payload = {
             "action": "updateNoteFields",
