@@ -127,7 +127,7 @@ def get_extract_image_prompt():
         "- Provide a Cambridge-style English definition on the next line in [brackets].\n"
         "- One expression per card. No Russian translations.\n"
         "- No more than 3 synonyms in 'Back'.\n"
-        "- Keep language simple and natural (A2–B2). Prefer contexts relevant to IT/ML, hiking, running, cooking, education.\n\n"
+        "- Keep language simple and natural (A2–B1). Prefer contexts relevant to IT/ML, hiking, running, cooking, education.\n\n"
         
         "Examples:\n\n"
         "### Example 1 (image with highlighted phrase in text)\n"
@@ -173,9 +173,10 @@ def get_change_pairs_prompt():
         "- 'Front': one natural English sentence with EXACTLY ONE '{{c1::...}}' around the target expression, then a newline + [short Cambridge-style English definition].\n"
         "- 'Back': 1–3 short synonyms or paraphrases, comma-separated.\n"
         "- One expression per card. No Russian translations.\n"
-        "- Keep language simple (A2–B2), concise, and native-sounding.\n"
+        "- Keep language simple (A2–B1), concise, and native-sounding.\n"
         "- Prefer contexts relevant to IT/ML, hiking, running, cooking, education.\n"
-        "- If multiple good options exist for an input, return multiple cards for that input (as a list).\n\n"
+        "- If multiple good options exist for an input, return multiple cards for that input (as a list).\n"
+        "- If one input contains TWO OR MORE distinct key expressions (e.g., separated by '/' or 'and'), SPLIT them into separate cloze cards for that single input.\n\n"
 
         "Examples:\n\n"
         "### Example 1 (improving a non-cloze card)\n"
@@ -183,7 +184,6 @@ def get_change_pairs_prompt():
         "Output for this single input (multiple candidates allowed):\n"
         "[\n"
         "  { 'Front': 'We need to {{c1::tackle}} the issue before launch.\\n\\n[to try to deal with a difficult situation]', 'Back': 'deal with, handle' },\n"
-        "  { 'Front': 'The new team lead {{c1::tackled}} the budget problem quickly.\\n\\n[to try to deal with a difficult situation]', 'Back': 'address, handle' }\n"
         "]\n\n"
 
         "### Example 2 (basic word -> cloze)\n"
@@ -198,6 +198,23 @@ def get_change_pairs_prompt():
         "Output:\n"
         "[\n"
         "  { 'Front': 'The team worked late to {{c1::meet the deadline}}.\\n\\n[to finish something by an agreed time]', 'Back': 'finish on time, deliver, complete' }\n"
+        "]\n\n"
+
+        "### Example 4 (split one input with multiple key expressions)\n"
+        "Input: {'Front': 'to give smth a shot / a try / a go', 'Back': ''}\n"
+        "Output (three separate cards for one input):\n"
+        "[\n"
+        "  { 'Front': 'We should {{c1::give it a shot}} and see if it works.\\n\\n[to try to do something]', 'Back': 'try, attempt' },\n"
+        "  { 'Front': 'He decided to {{c1::give it a try}} after the demo.\\n\\n[to attempt to do something]', 'Back': 'attempt, test' },\n"
+        "  { 'Front': 'Let's {{c1::give it a go}} before we hire a contractor.\\n\\n[to try doing something]', 'Back': 'try, attempt' }\n"
+        "]\n\n"
+
+        "### Example 5 (split synonyms in one input)\n"
+        "Input: {'Front': 'i'm annoyed / irritated', 'Back': ''}\n"
+        "Output (two separate cards for one input):\n"
+        "[\n"
+        "  { 'Front': 'I was {{c1::annoyed}} by the constant notifications.\\n\\n[slightly angry or bothered]', 'Back': 'bothered, upset' },\n"
+        "  { 'Front': 'She felt {{c1::irritated}} by the repeated delays.\\n\\n[becoming slightly angry or impatient]', 'Back': 'annoyed, bothered' }\n"
         "]\n\n"
 
         "Now, improve the following cards:\n"
