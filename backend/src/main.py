@@ -219,7 +219,7 @@ async def get_cards_red(deck_name: str) -> CardsResponse:
         return RedCardsResponse(cards=[])
 
     cards_info = await anki_service.cards_info(card_ids)
-    # Convert to RedCardModel
+    # Convert to RedCardModel (Front/Back only)
     red_cards = []
     for card_info in cards_info:
         note_id = card_info.get("noteId")
@@ -245,9 +245,10 @@ async def update_cards_red_auto(deck_name: str) -> BeforeAfterResponse:
 
     before_cards = []
     for cinfo in cards_info:
-        note_id = cinfo["note"]
-        front_value = cinfo["fields"]["Front"]["value"]
-        back_value = cinfo["fields"]["Back"]["value"]
+        note_id = cinfo.get("noteId")
+        fields = cinfo.get("fields", {})
+        front_value = fields.get("Front", {}).get("value", "")
+        back_value = fields.get("Back", {}).get("value", "")
         before_cards.append({
             "noteId": note_id,
             "Front": front_value,
@@ -306,10 +307,11 @@ async def update_cards_red_manual_get(
         if not cinfo:
             continue
         
-        note_id = cinfo["noteId"]
-        front_value = cinfo["fields"]["Front"]["value"]
+        note_id = cinfo.get("noteId")
+        fields = cinfo.get("fields", {})
+        front_value = fields.get("Front", {}).get("value", "")
         front_value, _ = remove_sound_tags(front_value)
-        back_value = cinfo["fields"]["Back"]["value"]
+        back_value = fields.get("Back", {}).get("value", "")
         back_value, _ = remove_sound_tags(back_value)
         before_cards.append({
             "noteId": note_id,

@@ -212,7 +212,6 @@ async def apply_auto_changes_for_chunk(
                     'afterBack': ext_back,
                     'Status': status
                 })
-    results = [card.model_dump() for card in results]
     print(f"results = {results}")
     return results
 
