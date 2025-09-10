@@ -82,12 +82,13 @@ class AnkiService:
         update_fields = {"Front": front_html, "Back": back_html}
 
         payload = {
-            "action": "updateNoteFields",
+            "action": "updateNoteModel",
             "version": 6,
             "params": {
                 "note": {
                     "id": note_id,
                     "fields": update_fields,
+                    "modelName": "Cloze",
                 }
             }
         }
@@ -114,16 +115,18 @@ class AnkiService:
         payload = {
             "action": "findNotes",
             "version": 6,
-            "params": {"query": f"deck:{deck_name} flag:1"},
+            "params": {"query": f"deck:\"{deck_name}\" flag:1"},
         }
         try:
             response = await self.client.post("/", json=payload, timeout=5.0)
             response.raise_for_status()
             response_json = response.json()
+            logger.info(response_json)
+
             if response_json.get("error"):
                 logger.error(f"Error fetching red card IDs: {response_json['error']}")
                 return []
-            print(f"Got {len(response_json)} red cards")
+            logger.info(f"Got {len(response_json)} red cards")
             return response_json.get("result", [])
         except Exception as e:
             logger.error(f"get_cards_red error: {e}")
