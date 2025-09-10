@@ -1,6 +1,7 @@
 import httpx
 import json
 from openai import AsyncOpenAI
+import openai
 import os
 from typing import List, Dict
 from src.prompts import get_extract_text_prompt, get_extract_image_prompt, get_change_pairs_prompt
@@ -38,40 +39,33 @@ async def extract_pairs_from_text(text: str):
     #         {"Front": "knack for", "Back": "An aptitude for doing something."}]
     prompt = get_extract_text_prompt()
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": text},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "extract_cards",
+        resp = await client.responses.create(
+            model="gpt-5-nano-2025-08-07",
+            instructions=prompt,
+            input=json.dumps(text),
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "Anki_cards",
                     "strict": True,
-                    "description": "Extract useful collocations and output Cloze-style cards.",
                     "schema": {
                         "type": "object",
                         "properties": {
                             "Cards": {
                                 "type": "array",
                                 "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "Front": {
-                                            "type": "string",
-                                            "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Front": {"type": "string",
+                                                    "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]"},
+                                            "Back":  {"type": "string",
+                                                    "description": "1–3 short synonyms/near-phrases, comma-separated"}
                                         },
-                                        "Back": {
-                                            "type": "string",
-                                            "description": "1–3 short synonyms/near-phrases, comma-separated",
-                                        },
+                                        "required": ["Front", "Back"],
+                                        "additionalProperties": False
                                     },
-                                    "required": [
-                                        "Front",
-                                        "Back",
-                                    ],
-                                    "additionalProperties": False,
                                 },
                             },
                         },
@@ -80,15 +74,31 @@ async def extract_pairs_from_text(text: str):
                     },
                 },
             },
-            timeout=10,
-            max_tokens=1024 * 2,
+            timeout=30,
+            reasoning={
+                "effort": "minimal"
+                }
         )
-        
-        output = response.choices[0].message.content
-        if output:
-            data = json.loads(output)
-            pairs = data.get("Cards", [])
-            return pairs
+
+        output_str = None
+        try:
+            output_str = resp.output_text
+        except Exception:
+            output_str = None
+
+        if not output_str:
+            chunks = []
+            for item in getattr(resp, "output", []) or []:
+                if getattr(item, "type", None) == "message":
+                    for c in getattr(item, "content", []) or []:
+                        if getattr(c, "type", None) == "output_text" and isinstance(getattr(c, "text", None), str):
+                            chunks.append(c.text)
+            output_str = "".join(chunks).strip()
+
+        if output_str:
+            data = json.loads(output_str)
+            pairs_out = data.get("Cards", [])
+            return pairs_out
         else:
             raise ValueError("No response.")
 
@@ -115,27 +125,24 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
     #         {"Front": "knack for", "Back": "An aptitude for doing something."}]
     """Send an image and caption to OpenAI for structured processing and return extracted information."""
     try:
-        user_content = [
-            {
-                "type": "text",
-                "text": get_extract_image_prompt(),
-            },
-            {"type": "text", "text": "Image caption: " + image_caption},
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}",
-                    "detail": "high",
-                },
-            },
-        ]
+        user_content = []
+        if image_caption:
+            user_content.append({
+                "type": "input_text",
+                "text": "Image caption: " + image_caption,
+            })
+        user_content.append({
+            "type": "input_image",
+            "image_url": f"data:image/jpeg;base64,{base64_image}",
+        })
 
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": user_content}],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
+        resp = await client.responses.create(
+            model="gpt-5-nano-2025-08-07",
+            instructions=get_extract_image_prompt(),
+            input=[{"role": "user", "content": user_content}],
+            text={
+                "format": {
+                    "type": "json_schema",
                     "name": "image_cards_extraction",
                     "strict": True,
                     "schema": {
@@ -163,14 +170,31 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
                         "required": ["Cards"],
                         "additionalProperties": False,
                     },
-                },
+                }
             },
-            max_tokens=1024,
+            max_output_tokens=1024,
+            reasoning={
+                "effort": "minimal"
+                },
         )
 
-        output = response.choices[0].message.content
-        if output:
-            data = json.loads(output)
+        output_str = None
+        try:
+            output_str = resp.output_text
+        except Exception:
+            output_str = None
+
+        if not output_str:
+            chunks = []
+            for item in getattr(resp, "output", []) or []:
+                if getattr(item, "type", None) == "message":
+                    for c in getattr(item, "content", []) or []:
+                        if getattr(c, "type", None) == "output_text" and isinstance(getattr(c, "text", None), str):
+                            chunks.append(c.text)
+            output_str = "".join(chunks).strip()
+
+        if output_str:
+            data = json.loads(output_str)
             pairs = data.get("Cards", [])
             return pairs
         else:
@@ -193,12 +217,12 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
     """
 
     # 0) Debug short-circuit:
-    debug_result = []
-    for _ in pairs:
-        debug_result.append([
-            {"Front": "knack for", "Back": "An aptitude for doing something."},
-            {"Front": "knack for v2", "Back": "Another example."}
-        ])
+    # debug_result = []
+    # for _ in pairs:
+    #     debug_result.append([
+    #         {"Front": "knack for", "Back": "An aptitude for doing something."},
+    #         {"Front": "knack for v2", "Back": "Another example."}
+    #     ])
     # Uncomment to skip the LLM and return debug data
     # return debug_result
 
@@ -208,66 +232,84 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
     # 2) Create the JSON schema for the structured outputs
     schema = {
         "name": "changing_anki_cards",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "Cards": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "Front": {"type": "string",
-                                          "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]"},
-                                "Back":  {"type": "string",
-                                          "description": "1–3 short synonyms/near-phrases, comma-separated"}
+       
+    }
+
+    # 3) Call the model via Python SDK Responses API
+    try:
+        resp = await client.responses.create(
+            model="gpt-5-nano-2025-08-07",
+            instructions=prompt,
+            input=json.dumps(pairs),
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "Anki_cards",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "Cards": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Front": {"type": "string",
+                                                    "description": "One sentence with EXACTLY ONE {{c1::...}} around the target, then newline + [short English definition]"},
+                                            "Back":  {"type": "string",
+                                                    "description": "1–3 short synonyms/near-phrases, comma-separated"}
+                                        },
+                                        "required": ["Front", "Back"],
+                                        "additionalProperties": False
+                                    },
+                                },
                             },
-                            "required": ["Front", "Back"],
-                            "additionalProperties": False
                         },
+                        "required": ["Cards"],
+                        "additionalProperties": False,
                     },
                 },
             },
-            "required": ["Cards"],
-            "additionalProperties": False,
-        }
-    }
-
-    # 3) Call the model
-    try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",  # or a supported snapshot
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": json.dumps(pairs)},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": schema,
-            },
-            max_tokens=2048,
             timeout=30,
+            reasoning={
+                "effort": "minimal"
+                }
         )
 
-        # 4) Parse output
-        output_str = response.choices[0].message.content
+        # 4) Extract output text
+        output_str = None
+        try:
+            output_str = resp.output_text
+        except Exception:
+            output_str = None
+
+        if not output_str:
+            # Fallback: concatenate output_text items
+            text_chunks = []
+            try:
+                for item in getattr(resp, "output", []) or []:
+                    if getattr(item, "type", None) == "message":
+                        for c in getattr(item, "content", []) or []:
+                            if getattr(c, "type", None) == "output_text" and isinstance(getattr(c, "text", None), str):
+                                text_chunks.append(c.text)
+            except Exception:
+                pass
+            output_str = "".join(text_chunks).strip()
+
         if not output_str:
             raise ValueError("No content returned by the model")
-        
-        data = json.loads(output_str)
-        # data should be a list of sub-lists
-        # e.g.  [ [ {Front,Back}, {Front,Back} ], [ ... ] ]
-        print(data)
-        data = data.get("Cards", [])
-        print(data)
-        if len(data) != len(pairs):
-            print(f"WARNING: The model returned {len(data)} items, expected {len(pairs)}")
 
-        return data
+        data = json.loads(output_str)
+        # Expecting object with "Cards": [ [ {Front,Back}, ... ], ... ]
+        cards = data.get("Cards", [])
+        if len(cards) != len(pairs):
+            print(f"WARNING: The model returned {len(cards)} items, expected {len(pairs)}")
+
+        return cards
 
     except Exception as e:
         print(f"Error in change_anki_pairs: {e}")
-        # Return an empty 2D array
+        # Return an empty 2D array shape-compatible with input
         return [[] for _ in pairs]
