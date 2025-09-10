@@ -8,12 +8,12 @@ authors = [
 dependencies = [
     "requests>=2.32.3",
     "fastapi>=0.115.0",
-    "openai>=1.50.2",
     "uvicorn>=0.31.0",
     "python-dotenv>=1.0.1",
     "python-multipart>=0.0.12",
     "aiofiles>=24.1.0",
     "tenacity>=9.0.0",
+    "openai>=1.107.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
