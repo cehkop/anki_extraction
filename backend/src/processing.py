@@ -40,7 +40,7 @@ async def extract_pairs_from_text(text: str):
     prompt = get_extract_text_prompt()
     try:
         resp = await client.responses.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-4o-mini-2024-07-18",
             instructions=prompt,
             input=json.dumps(text),
             text={
@@ -75,9 +75,7 @@ async def extract_pairs_from_text(text: str):
                 },
             },
             timeout=30,
-            reasoning={
-                "effort": "minimal"
-                }
+            max_output_tokens=1024,
         )
 
         output_str = None
@@ -137,7 +135,7 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
         })
 
         resp = await client.responses.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-4o-mini-2024-07-18",
             instructions=get_extract_image_prompt(),
             input=[{"role": "user", "content": user_content}],
             text={
@@ -173,9 +171,6 @@ async def extract_pairs_from_image(base64_image, image_caption=""):
                 }
             },
             max_output_tokens=1024,
-            reasoning={
-                "effort": "minimal"
-                },
         )
 
         output_str = None
@@ -238,7 +233,7 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
     # 3) Call the model via Python SDK Responses API
     try:
         resp = await client.responses.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-4o-mini-2024-07-18",
             instructions=prompt,
             input=json.dumps(pairs),
             text={
@@ -273,9 +268,7 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
                 },
             },
             timeout=30,
-            reasoning={
-                "effort": "minimal"
-                }
+            max_output_tokens=1024,
         )
 
         # 4) Extract output text
@@ -286,6 +279,7 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
             output_str = None
 
         if not output_str:
+            print(resp)
             # Fallback: concatenate output_text items
             text_chunks = []
             try:
@@ -300,7 +294,7 @@ async def change_anki_pairs(pairs: List[Dict[str, str]]) -> List[List[Dict[str, 
 
         if not output_str:
             raise ValueError("No content returned by the model")
-
+        print(output_str)
         data = json.loads(output_str)
         # Expecting object with "Cards": [ [ {Front,Back}, ... ], ... ]
         cards = data.get("Cards", [])

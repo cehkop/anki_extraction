@@ -320,7 +320,7 @@ async def update_cards_red_manual_get(
         })
 
     results = []
-    batch_size = 3
+    batch_size = 5
     # 1) chunk the cards and call change_anki_pairs in chunks
     for i in range(0, len(before_cards), batch_size):
         chunk = before_cards[i : i + batch_size]

@@ -180,6 +180,7 @@ def get_change_pairs_prompt():
         "- Output is two-dim array [[{Front1, Back1}],[{Front2, Back2}],[{Front3,Back3}]].\n"
         "- It's bettor to generate 1 perfect to learn card for each cloze than two or more but worse.\n"
         "- If one input contains TWO OR MORE distinct key expressions (e.g., separated by '/' or 'and'), SPLIT them into separate cloze cards for that single input. It that case output is [[{Front1.1, Back1.1},{Front1.2, Back1.2},{Front1.3, Back1.3}],[{Front2, Back2}],[{Front3,Back3}]].\n\n"
+        "- You MUST answer in the provided JSON structure.\n"
 
         "Examples:\n\n"
         "### Example 1 (improving a non-cloze card)\n"
