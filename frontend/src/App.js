@@ -18,7 +18,15 @@ function App() {
     <Box sx={{ flexGrow: 1, height: '100vh' }}>
       <Grid container sx={{ height: '100%' }}>
         {/* Sidebar */}
-        <Grid item xs={2} sx={{ borderRight: '1px solid #444', height: '100%' }}>
+        <Grid
+          item
+          sx={{
+            borderRight: '1px solid #444',
+            height: '100%',
+            flexBasis: '11.6667%', // 2 columns * 0.7 of 12-column grid
+            maxWidth: '11.6667%',
+          }}
+        >
           <Config
             inputMode={inputMode}
             setInputMode={setInputMode}
@@ -30,7 +38,15 @@ function App() {
         </Grid>
 
         {/* Main Content */}
-        <Grid item xs={7} sx={{ borderRight: '1px solid #444', height: '100%' }}>
+        <Grid
+          item
+          sx={{
+            borderRight: '1px solid #444',
+            height: '100%',
+            flexBasis: '68.3333%', // remaining width after left (11.6667%) and right (20%)
+            maxWidth: '68.3333%',
+          }}
+        >
           <InputSection
             inputMode={inputMode}
             handleLog={handleLog}
@@ -40,7 +56,14 @@ function App() {
         </Grid>
 
         {/* Log Section */}
-        <Grid item xs={3} sx={{ height: '100%' }}>
+        <Grid
+          item
+          sx={{
+            height: '100%',
+            flexBasis: '20%', // 3 columns * 0.8 of 12-column grid
+            maxWidth: '20%',
+          }}
+        >
           <Log logs={logs} />
         </Grid>
       </Grid>
